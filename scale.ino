@@ -23,9 +23,10 @@ Display lcd (
 
 // initial state of the scale
 ScaleState state(
+  /* timezone */           -6, // Mountain Daylight Time -6 / Mountain Standard Time -7
   /* locked */          false,
   /* logging */         false,
-  /* log_period */         40, // in seconds
+  /* log_period */         70, // in seconds
   /* read_period */         5 // in seconds
 );
 
@@ -47,6 +48,7 @@ void update_user_interface (ScaleState state) {
   Serial.println("@UI - Logging: " + String(logging_lcd));
   Serial.println("@UI - Locked: " + String(locked_lcd));
   Serial.println("@UI - Period: " + String(state.log_period));
+  Serial.println("@UI - Read: " + String(state.read_period));
 
   // lcd
   /*
@@ -81,7 +83,7 @@ void report_scale_command (const ScaleController& scale) {
   update_user_interface(scale.state);
 }
 
-ScaleController scale(state, report_scale_command);
+ScaleController scale(RESET_pin, state, report_scale_command);
 
 
 // device name
@@ -105,25 +107,22 @@ void setup() {
   // serial
   Serial.begin(9600);
 
+  delay(3000);
+
   // time // FIXME: allow for external setting of the time zone
-  Time.zone(-6); // Mountain Daylight Time -6 / Mountain Standard Time -7
-  Serial.print("INFO: starting up at time ");
-  Serial.println(Time.format("%Y-%m-%d %H:%M:%S"));
+  //Time.zone(-6); // Mountain Daylight Time -6 / Mountain Standard Time -7
+
+  // scale
+  Serial.println("INFO: initialize scale");
+  scale.init();
 
   // check for reset
-  bool reset = FALSE;
-  if(digitalRead(RESET_pin) == HIGH) {
-    reset = TRUE;
-    Serial.println("INFO: reset request detected");
+  if (scale.reset) {
     #ifdef ENABLE_DISPLAY
       lcd.print_line(1, "Resetting...");
       delay(1000);
     #endif
   }
-
-  // scale
-  Serial.println("INFO: initialize scale");
-  scale.init(reset);
 
   // user interface update
   Serial.println("INFO: updating user interface");

@@ -1,14 +1,42 @@
 #include "DeviceState.h"
 
 // scale state
-struct ScaleState : DeviceState {
-  int log_period; // period between logs
-  int read_period; // period between reads
+class ScaleState : public DeviceState {
+  public:
+    bool logging =true;
+    int log_period; // period between logs
+    int read_period; // period between reads
 
-  ScaleState() {};
-  ScaleState(bool locked, bool logging, int log_period, int read_period) :
-    DeviceState(locked, logging), log_period(log_period), read_period(read_period) {};
+    ScaleState() {};
+    ScaleState(int timezone, bool locked, bool logging, int log_period, int read_period) :
+      DeviceState(timezone, locked, logging, logging), log_period(log_period), read_period(read_period) {};
+
+    // save to EEPROM
+    void save() {
+      EEPROM.put(STATE_ADDRESS, *this);
+      Serial.println("INFO: scale state saved in memory (if any updates were necessary)");
+      DeviceState::save();
+    }
+
+    // load from EEPROM
+    bool load(){
+      ScaleState saved_state;
+      EEPROM.get(STATE_ADDRESS, saved_state);
+      bool recoverable = saved_state.version == STATE_VERSION;
+      if(recoverable) {
+        EEPROM.get(STATE_ADDRESS, *this);
+        Serial.println("INFO: successfully restored state from memory (version " + String(STATE_VERSION) + ")");
+      } else {
+        Serial.println("INFO: could not restore state from memory (found version " + String(saved_state.version) + "), sticking with initial default");
+        save();
+      }
+      DeviceState::load();
+      return(recoverable);
+    }
+
 };
+
+
 
 // NOTE: size is passed as safety precaution to not overallocate the target
 // sizeof(target) would not work because it's a pointer (always size 4)
