@@ -132,11 +132,10 @@ void DeviceController::setNameCallback(void (*cb)()) {
 
 void DeviceController::updateStateInformation() {
 
-  Serial.println("INFO: updating state information ");
+  Serial.print("INFO: updating state information: ");
   state_information_buffer[0] = 0; // reset buffer
   assembleStateInformation();
   snprintf(state_information, sizeof(state_information), "{%s}", state_information_buffer);
-  Serial.print("INFO: state information updated: ");
   Serial.println(state_information);
 }
 

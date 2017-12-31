@@ -103,8 +103,7 @@ void setup() {
     #endif
   }
 
-  // user interface update
-  Serial.println("INFO: updating user interface");
+  // initial user interface update
   update_user_interface();
 
   // connect device to cloud and register for listeners
