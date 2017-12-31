@@ -1,37 +1,19 @@
+#pragma once
 #include "DeviceState.h"
+#include "ScaleCommands.h"
 
 // scale state
 struct ScaleState : public DeviceState {
-  bool logging =true;
-  int log_period; // period between logs
-  int read_period; // period between reads
+  int data_logging_period; // period between logs
 
   ScaleState() {};
-  ScaleState(int timezone, bool locked, bool logging, int log_period, int read_period) :
-    DeviceState(timezone, locked, logging, logging), log_period(log_period), read_period(read_period) {};
+  ScaleState(int timezone, bool locked, bool state_logging, bool data_logging, int data_logging_period) :
+    DeviceState(timezone, locked, state_logging, data_logging), data_logging_period(data_logging_period) {};
 };
 
+/**** textual translations of state values ****/
 
-
-// NOTE: size is passed as safety precaution to not overallocate the target
-// sizeof(target) would not work because it's a pointer (always size 4)
-
-static void get_scale_state_logging_info(bool logging, char* target_short, int size_short, char* target_long, int size_long) {
-  if (logging) {
-    strncpy(target_short, "logging", size_short - 1);
-    strncpy(target_long, "logging started", size_long - 1);
-  } else {
-    strcpy(target_short, "no log");
-    strncpy(target_long, "logging stopped", size_long - 1);
-  }
-}
-
-static void get_scale_state_locked_info(bool locked, char* target_short, int size_short, char* target_long, int size_long) {
-  if (locked) {
-    strncpy(target_short, "LOCK", size_short - 1);
-    strncpy(target_long, "locked", size_long - 1);
-  } else {
-    strcpy(target_short, "");
-    strncpy(target_long, "ready", size_long - 1);
-  }
+// read_period
+static void getStateDataLoggingPeriodText(int logging_period, char* target, int size, bool value_only = false) {
+  getStateIntText(logging_period, CMD_DATA_LOG_PERIOD, target, size, value_only);
 }

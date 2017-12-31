@@ -34,8 +34,9 @@ class ScaleController : public DeviceController {
     bool restoreDS(); // load device state from EEPROM
 
     // state changes and corresponding commands
-    bool changeReadPeriod(int period);
-    bool parseReadPeriod();
+    bool changeDataLoggingPeriod(int period);
+    bool parseDataLoggingPeriod();
+    void assembleStateInformation();
 
     // particle command
     void parseCommand (); // parse a cloud command
@@ -81,27 +82,41 @@ bool ScaleController::restoreDS(){
 /**** CHANGING STATE ****/
 
 // read period
-bool ScaleController::changeReadPeriod(int period) {
-  bool changed = period != state->read_period;
+bool ScaleController::changeDataLoggingPeriod(int period) {
+  bool changed = period != state->data_logging_period;
 
   if (changed) {
-    state->read_period = period;
-    Serial.println("INFO: setting read period to " + String(period) + " seconds");
+    state->data_logging_period = period;
+    Serial.println("INFO: setting data logging period to " + String(period) + " seconds");
     saveDS();
   } else {
-    Serial.println("INFO: read period unchanged (" + String(period) + ")");
+    Serial.println("INFO: data logging period unchanged (" + String(period) + ")");
   }
   return(changed);
 }
 
-bool ScaleController::parseReadPeriod() {
-  if (command.parseVariable(CMD_READ_PERIOD)) {
+bool ScaleController::parseDataLoggingPeriod() {
+  if (command.parseVariable(CMD_DATA_LOG_PERIOD)) {
     // parse read period
     command.assignValue();
     int period = atoi(command.value);
-    (period >= 0) ? command.success(changeReadPeriod(period)) : command.errorValue();
+    if (period >= 0) {
+      command.success(changeDataLoggingPeriod(period));
+      strcpy(command.units, "seconds");
+    } else {
+      command.errorValue();
+    }
   }
   return(command.isTypeDefined());
+}
+
+/******  STATE INFORMATION *******/
+
+void ScaleController::assembleStateInformation() {
+  DeviceController::assembleStateInformation();
+  char pair[60];
+  getStateDataLoggingPeriodText(state->data_logging_period, pair, sizeof(pair), false); addToStateInformation(pair);
+  // FIXME: continue here
 }
 
 /****** WEB COMMAND PROCESSING *******/
@@ -113,12 +128,15 @@ void ScaleController::parseCommand() {
     // locked is getting parsed
   } else if (parseStateLogging()) {
     // state logging getting parsed
+  } else if (parseDataLogging()) {
+    // state logging getting parsed
   } else if (parseTimezone()) {
     // time zone getting parsed
-  } else if (parseReadPeriod()) {
+  } else if (parseDataLoggingPeriod()) {
     // parsing read period
   } else {
     // other commands
+    // FIXME: continue here
   }
 
 }

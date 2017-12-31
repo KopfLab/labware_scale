@@ -2,6 +2,7 @@
 #include "DeviceState.h"
 
 // controller class
+#define STATE_INFO_MAX_CHAR   600 // how long is the state information maximally
 class DeviceController {
 
   private:
@@ -10,8 +11,9 @@ class DeviceController {
     const int reset_pin;
     bool reset = false;
 
-    // device name
+    // device info
     bool name_handler_registered = false;
+    char state_information_buffer[STATE_INFO_MAX_CHAR-2];
 
     // call backs
     void (*name_callback)();
@@ -40,6 +42,13 @@ class DeviceController {
     void captureName(const char *topic, const char *data);
     void setNameCallback(void (*cb)()); // assign a callback function
 
+    // state information
+    char state_information[STATE_INFO_MAX_CHAR];
+    void updateStateInformation();
+    virtual void assembleStateInformation();
+    void addToStateInformation(char* info);
+    void addToStateInformation(char* info, char* sep);
+
     // state control & persistence functions (implement in derived classes)
     virtual DeviceState* getDS() = 0; // fetch the device state pointer
     virtual void saveDS() = 0; // save device state to EEPROM
@@ -48,6 +57,7 @@ class DeviceController {
     // state change functions (will work in derived classes as long as getDS() is re-implemented)
     bool changeLocked(bool on);
     bool changeStateLogging(bool on);
+    bool changeDataLogging(bool on);
     bool changeTimezone(int tz);
 
     // particle command parsing functions
@@ -57,6 +67,7 @@ class DeviceController {
     virtual void parseCommand () = 0; // parse a cloud command
     bool parseLocked();
     bool parseStateLogging();
+    bool parseDataLogging();
     bool parseTimezone();
 };
 
@@ -70,6 +81,7 @@ void DeviceController::init() {
   Serial.println("INFO: registering device cloud variables");
   Particle.subscribe("spark/", &DeviceController::captureName, this);
   Particle.function(CMD_ROOT, &DeviceController::receiveCommand, this);
+  Particle.variable(STATE_VARIABLE, state_information);
 
   //  check for reset
   if(digitalRead(reset_pin) == HIGH) {
@@ -89,6 +101,9 @@ void DeviceController::init() {
   Time.zone(getDS()->timezone);
   time_t time = Time.now();
   Serial.println(Time.format(time, "INFO: startup time: %Y-%m-%d %H:%M:%S"));
+
+  // state information
+  updateStateInformation();
 }
 
 void DeviceController::update() {
@@ -111,6 +126,39 @@ void DeviceController::captureName(const char *topic, const char *data) {
 
 void DeviceController::setNameCallback(void (*cb)()) {
   name_callback = cb;
+}
+
+/* STATE INFORMATION */
+
+void DeviceController::updateStateInformation() {
+
+  Serial.println("INFO: updating state information ");
+  state_information_buffer[0] = 0; // reset buffer
+  assembleStateInformation();
+  snprintf(state_information, sizeof(state_information), "{%s}", state_information_buffer);
+  Serial.print("INFO: state information updated: ");
+  Serial.println(state_information);
+}
+
+void DeviceController::addToStateInformation(char* info) {
+  addToStateInformation(info, ",");
+}
+
+void DeviceController::addToStateInformation(char* info, char* sep) {
+  if (state_information_buffer[0] == 0) {
+    strncpy(state_information_buffer, info, sizeof(state_information_buffer));
+  } else {
+    snprintf(state_information_buffer, sizeof(state_information_buffer),
+        "%s%s%s", state_information_buffer, sep, info);
+  }
+}
+
+void DeviceController::assembleStateInformation() {
+  char pair[60];
+  getStateTimezoneText(getDS()->timezone, pair, sizeof(pair), false); addToStateInformation(pair);
+  getStateLockedText(getDS()->locked, pair, sizeof(pair), false); addToStateInformation(pair);
+  getStateStateLoggingText(getDS()->state_logging, pair, sizeof(pair), false); addToStateInformation(pair);
+  getStateDataLoggingText(getDS()->data_logging, pair, sizeof(pair), false); addToStateInformation(pair);
 }
 
 /* DEVICE STATE CHANGE FUNCTIONS */
@@ -139,6 +187,20 @@ bool DeviceController::changeStateLogging (bool on) {
     saveDS();
   } else {
     on ? Serial.println("INFO: state logging already on") : Serial.println("INFO: state logging already off");
+  }
+  return(changed);
+}
+
+// data log
+bool DeviceController::changeDataLogging (bool on) {
+  bool changed = on != getDS()->data_logging;
+
+  if (changed) {
+    getDS()->data_logging = on;
+    on ? Serial.println("INFO: data logging turned on") : Serial.println("INFO: data logging turned off");
+    saveDS();
+  } else {
+    on ? Serial.println("INFO: data logging already on") : Serial.println("INFO: data logging already off");
   }
   return(changed);
 }
@@ -175,9 +237,9 @@ bool DeviceController::parseLocked() {
     // locking
     command.assignValue();
     if (command.parseValue(CMD_LOCK_ON)) {
-      command.success(changeLocked(true), true);
+      command.success(changeLocked(true));
     } else if (command.parseValue(CMD_LOCK_OFF)) {
-      command.success(changeLocked(false), true);
+      command.success(changeLocked(false));
     }
   } else if (getDS()->locked) {
     // device is locked --> no other commands allowed
@@ -191,9 +253,22 @@ bool DeviceController::parseStateLogging() {
     // state logging
     command.assignValue();
     if (command.parseValue(CMD_STATE_LOG_ON)) {
-      command.success(changeStateLogging(true), true);
+      command.success(changeStateLogging(true));
     } else if (command.parseValue(CMD_STATE_LOG_OFF)) {
-      command.success(changeStateLogging(false), true);
+      command.success(changeStateLogging(false));
+    }
+  }
+  return(command.isTypeDefined());
+}
+
+bool DeviceController::parseDataLogging() {
+  if (command.parseVariable(CMD_DATA_LOG)) {
+    // state logging
+    command.assignValue();
+    if (command.parseValue(CMD_DATA_LOG_ON)) {
+      command.success(changeDataLogging(true));
+    } else if (command.parseValue(CMD_DATA_LOG_OFF)) {
+      command.success(changeDataLogging(false));
     }
   }
   return(command.isTypeDefined());
@@ -218,6 +293,11 @@ int DeviceController::receiveCommand(String command_string) {
   command.assignVariable();
   parseCommand();
   command.finalize();
+
+  // state information
+  if (command.ret_val >= CMD_RET_SUCCESS && command.ret_val != CMD_RET_WARN_NO_CHANGE) {
+    updateStateInformation();
+  }
 
   // command reporting callback
   if (command_callback) command_callback();

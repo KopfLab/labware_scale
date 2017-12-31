@@ -24,11 +24,11 @@ Display lcd (
 
 // initial state of the scale
 ScaleState* state = new ScaleState(
-  /* timezone */           -6, // Mountain Daylight Time -6 / Mountain Standard Time -7
-  /* locked */          false,
-  /* logging */         false,
-  /* log_period */         70, // in seconds
-  /* read_period */         5 // in seconds
+  /* timezone */                 -6, // Mountain Daylight Time -6 / Mountain Standard Time -7
+  /* locked */                false,
+  /* state_logging */         true,
+  /* data_logging */          false,
+  /* data_logging_period */      70 // in seconds
 );
 
 // scale controller
@@ -38,7 +38,7 @@ ScaleController* scale = new ScaleController(
 );
 
 // state information & function to update the user interface(s) based on changes in the state
-char state_information[600] = "";
+//char state_information[600] = "";
 
 char logging_lcd[7];
 char logging_web[20];
@@ -47,18 +47,7 @@ char locked_web[20];
 
 // user interface update
 void update_user_interface () {
-
-  // user interface update text
-  //get_scale_state_logging_info(state.logging, logging_lcd, sizeof(logging_lcd), logging_web, sizeof(logging_web));
-  //get_scale_state_locked_info(state.locked, locked_lcd, sizeof(locked_lcd), locked_web, sizeof(locked_web));
-
-  // serial (for debugging)
-  Serial.println("@UI - Locked: " + String(state->locked));
-  Serial.println("@UI - Logging: " + String(state->state_logging));
-  Serial.println("@UI - Period: " + String(state->log_period));
-  Serial.println("@UI - Read: " + String(state->read_period));
-  Serial.println("@UI - Timezone: " + String(state->timezone));
-
+  Serial.println("INFO: GUI update callback");
   // lcd
   /*
   #ifdef ENABLE_DISPLAY
@@ -67,15 +56,11 @@ void update_user_interface () {
     lcd.print_line(3, "Dir: " + String(dir_lcd) + " " + String(locked_lcd));
   #endif
   */
-
-  // web
-  //snprintf(state_information, sizeof(state_information),
-  //  "{\"logging\":\"%s\", \"lock\":\"%s\"}", logging_web, locked_web);
 }
 
 // callback function for commands
 void report_command () {
-  Serial.println("INFO: scale command - " +
+  Serial.println("INFO: command callback: " +
     String(scale->getCommand()->type) + " " +
     String(scale->getCommand()->variable) + " " +
     String(scale->getCommand()->value));
@@ -124,7 +109,6 @@ void setup() {
 
   // connect device to cloud and register for listeners
   Serial.println("INFO: connecting to cloud");
-  //Particle.variable("state", state_information);
   Particle.connect();
 
 }
