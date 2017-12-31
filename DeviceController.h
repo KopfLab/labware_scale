@@ -10,13 +10,17 @@ class DeviceController {
     const int reset_pin;
     bool reset = false;
 
+    // device name
+    bool name_handler_registered = false;
+
+    // call backs
+    void (*name_callback)();
+    void (*command_callback)();
+
   protected:
 
     // command
     DeviceCommand command;
-
-    // call back
-    void (*command_callback)();
 
   public:
 
@@ -31,6 +35,11 @@ class DeviceController {
     // reset
     bool wasReset() { reset; }; // whether controller was started in reset mode
 
+    // device name
+    char name[20];
+    void captureName(const char *topic, const char *data);
+    void setNameCallback(void (*cb)()); // assign a callback function
+
     // state control & persistence functions (implement in derived classes)
     virtual DeviceState* getDS() = 0; // fetch the device state pointer
     virtual void saveDS() = 0; // save device state to EEPROM
@@ -42,10 +51,10 @@ class DeviceController {
     bool changeTimezone(int tz);
 
     // particle command parsing functions
-    virtual void registerCommand() = 0; // register the particle function (implement in derived classes)
     DeviceCommand* getCommand(); // get pointer to the command object
     void setCommandCallback(void (*cb)()); // assign a callback function
-    void callCommandCallback(); // call the callback
+    int receiveCommand (String command); // receive cloud command
+    virtual void parseCommand () = 0; // parse a cloud command
     bool parseLocked();
     bool parseStateLogging();
     bool parseTimezone();
@@ -57,8 +66,10 @@ void DeviceController::init() {
   // define pins
   pinMode(reset_pin, INPUT_PULLDOWN);
 
-  // register particle function
-  registerCommand();
+  // register particle functions
+  Serial.println("INFO: registering device cloud variables");
+  Particle.subscribe("spark/", &DeviceController::captureName, this);
+  Particle.function(CMD_ROOT, &DeviceController::receiveCommand, this);
 
   //  check for reset
   if(digitalRead(reset_pin) == HIGH) {
@@ -81,7 +92,25 @@ void DeviceController::init() {
 }
 
 void DeviceController::update() {
-  // nothing happens in default loop
+
+  // name capture
+  if (!name_handler_registered && Particle.connected()){
+    name_handler_registered = Particle.publish("spark/device/name");
+    Serial.println("INFO: name handler registered");
+  }
+
+}
+
+/* DEVICE NAME */
+
+void DeviceController::captureName(const char *topic, const char *data) {
+  strncpy ( name, data, sizeof(name) );
+  Serial.println("INFO: device name " + String(name));
+  if (name_callback) name_callback();
+}
+
+void DeviceController::setNameCallback(void (*cb)()) {
+  name_callback = cb;
 }
 
 /* DEVICE STATE CHANGE FUNCTIONS */
@@ -140,10 +169,6 @@ void DeviceController::setCommandCallback(void (*cb)()) {
   command_callback = cb;
 }
 
-void DeviceController::callCommandCallback() {
-  if (command_callback) command_callback();
-}
-
 bool DeviceController::parseLocked() {
   // decision tree
   if (command.parseVariable(CMD_LOCK)) {
@@ -182,4 +207,21 @@ bool DeviceController::parseTimezone() {
     (tz >= -12 && tz <= 14) ? command.success(changeTimezone(tz)) : command.errorValue();
   }
   return(command.isTypeDefined());
+}
+
+/****** WEB COMMAND PROCESSING *******/
+
+int DeviceController::receiveCommand(String command_string) {
+
+  // load, parse and finalize command
+  command.load(command_string);
+  command.assignVariable();
+  parseCommand();
+  command.finalize();
+
+  // command reporting callback
+  if (command_callback) command_callback();
+
+  // return value
+  return(command.ret_val);
 }

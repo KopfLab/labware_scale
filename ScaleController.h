@@ -37,10 +37,8 @@ class ScaleController : public DeviceController {
     bool changeReadPeriod(int period);
     bool parseReadPeriod();
 
-    // particle commands
-    void registerCommand() { Particle.function(CMD_ROOT, &ScaleController::parseCommand, this); }
-    int parseCommand (String command); // parse a cloud command
-
+    // particle command
+    void parseCommand (); // parse a cloud command
 };
 
 /**** SETUP & LOOP ****/
@@ -52,10 +50,9 @@ void ScaleController::init() {
 
 // loop function
 void ScaleController::update() {
-
+  DeviceController::update();
   // FIXME: implement
   // do the data reading and do the data logging if logs are on
-
 }
 
 /**** STATE PERSISTENCE ****/
@@ -109,11 +106,7 @@ bool ScaleController::parseReadPeriod() {
 
 /****** WEB COMMAND PROCESSING *******/
 
-int ScaleController::parseCommand(String command_string) {
-
-  // initialize command
-  command.load(command_string);
-  command.assignVariable();
+void ScaleController::parseCommand() {
 
   // decision tree
   if (parseLocked()) {
@@ -128,11 +121,4 @@ int ScaleController::parseCommand(String command_string) {
     // other commands
   }
 
-  // finalize command
-  command.finalize();
-
-  // command reporting callback
-  callCommandCallback();
-
-  return(command.ret_val);
 }

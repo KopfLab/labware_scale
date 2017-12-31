@@ -4,6 +4,10 @@
 // enable/disable sub-systems
 // #define ENABLE_DISPLAY
 
+// time sync
+#include "TimeSync.h";
+TimeSync* ts = new TimeSync();
+
 // display
 #ifdef ENABLE_DISPLAY
 #include "Display.h"
@@ -55,13 +59,6 @@ void update_user_interface () {
   Serial.println("@UI - Read: " + String(state->read_period));
   Serial.println("@UI - Timezone: " + String(state->timezone));
 
-/*
-  Serial.println("@UI - Locked: " + String(state.locked));
-  Serial.println("@UI - Logging: " + String(state.state_logging));
-  Serial.println("@UI - Period: " + String(state.log_period));
-  Serial.println("@UI - Read: " + String(state.read_period));
-  Serial.println("@UI - Timezone: " + String(state.timezone));
-*/
   // lcd
   /*
   #ifdef ENABLE_DISPLAY
@@ -78,7 +75,6 @@ void update_user_interface () {
 
 // callback function for commands
 void report_command () {
-  Serial.println("HERE!!!");
   Serial.println("INFO: scale command - " +
     String(scale->getCommand()->type) + " " +
     String(scale->getCommand()->variable) + " " +
@@ -86,20 +82,16 @@ void report_command () {
   update_user_interface();
 }
 
-// device name
-char device_name[20];
-void name_handler(const char *topic, const char *data) {
-  strncpy ( device_name, data, sizeof(device_name) );
-  Serial.println("INFO: device ID " + String(device_name));
+// callback function for device name
+void report_name() {
   #ifdef ENABLE_DISPLAY
-    lcd.print_line(4, "ID: " + String(device_name));
+    lcd.print_line(4, "Name: " + String(scale->name));
   #endif
 }
 
 // using system threading to speed up restart after power out
 SYSTEM_THREAD(ENABLED);
 SYSTEM_MODE(SEMI_AUTOMATIC);
-bool name_handler_registered = false;
 
 // setup
 void setup() {
@@ -107,14 +99,15 @@ void setup() {
   // serial
   Serial.begin(9600);
 
-  delay(2000);
+  delay(3000);
 
-  // time // FIXME: allow for external setting of the time zone
-  //Time.zone(-6); // Mountain Daylight Time -6 / Mountain Standard Time -7
+  // time sync
+  ts->init();
 
   // scale
   Serial.println("INFO: initialize scale");
   scale->setCommandCallback(report_command);
+  scale->setNameCallback(report_name);
   scale->init();
 
   // check for reset
@@ -127,27 +120,20 @@ void setup() {
 
   // user interface update
   Serial.println("INFO: updating user interface");
-  //update_user_interface(scale.state);
   update_user_interface();
 
   // connect device to cloud and register for listeners
-  Serial.println("INFO: registering spark variables and connecting to cloud");
-  Particle.variable("state", state_information);
-  Particle.subscribe("spark/", name_handler);
+  Serial.println("INFO: connecting to cloud");
+  //Particle.variable("state", state_information);
   Particle.connect();
 
 }
 
 // loop
 void loop() {
-  if (!name_handler_registered && Particle.connected()){
-    // running this here becaus we're in system thread mode and it won't work until connected
-    name_handler_registered = Particle.publish("spark/device/name");
-    Serial.println("INFO: name handler registered");
-  }
-
   #ifdef ENABLE_DISPLAY
     lcd.update();
   #endif
+  ts->update();
   scale->update();
 }
