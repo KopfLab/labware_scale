@@ -4,9 +4,6 @@
 // enable/disable sub-systems
 // #define ENABLE_DISPLAY
 
-// reset
-#define RESET_pin A5
-
 // display
 #ifdef ENABLE_DISPLAY
 #include "Display.h"
@@ -22,12 +19,18 @@ Display lcd (
 #include "ScaleController.h"
 
 // initial state of the scale
-ScaleState state(
+ScaleState* state = new ScaleState(
   /* timezone */           -6, // Mountain Daylight Time -6 / Mountain Standard Time -7
   /* locked */          false,
   /* logging */         false,
   /* log_period */         70, // in seconds
   /* read_period */         5 // in seconds
+);
+
+// scale controller
+ScaleController* scale = new ScaleController(
+  /* reset pin */         A5,
+  /* pointer to state */  state
 );
 
 // state information & function to update the user interface(s) based on changes in the state
@@ -38,19 +41,27 @@ char logging_web[20];
 char locked_lcd[6];
 char locked_web[20];
 
-void update_user_interface (ScaleState state) {
+// user interface update
+void update_user_interface () {
 
   // user interface update text
   //get_scale_state_logging_info(state.logging, logging_lcd, sizeof(logging_lcd), logging_web, sizeof(logging_web));
   //get_scale_state_locked_info(state.locked, locked_lcd, sizeof(locked_lcd), locked_web, sizeof(locked_web));
 
   // serial (for debugging)
+  Serial.println("@UI - Locked: " + String(state->locked));
+  Serial.println("@UI - Logging: " + String(state->state_logging));
+  Serial.println("@UI - Period: " + String(state->log_period));
+  Serial.println("@UI - Read: " + String(state->read_period));
+  Serial.println("@UI - Timezone: " + String(state->timezone));
+
+/*
   Serial.println("@UI - Locked: " + String(state.locked));
   Serial.println("@UI - Logging: " + String(state.state_logging));
   Serial.println("@UI - Period: " + String(state.log_period));
   Serial.println("@UI - Read: " + String(state.read_period));
   Serial.println("@UI - Timezone: " + String(state.timezone));
-
+*/
   // lcd
   /*
   #ifdef ENABLE_DISPLAY
@@ -61,31 +72,19 @@ void update_user_interface (ScaleState state) {
   */
 
   // web
-  snprintf(state_information, sizeof(state_information),
-    "{\"logging\":\"%s\", \"lock\":\"%s\"}", logging_web, locked_web);
+  //snprintf(state_information, sizeof(state_information),
+  //  "{\"logging\":\"%s\", \"lock\":\"%s\"}", logging_web, locked_web);
 }
 
-// callback function for scale commands
-void report_scale_command (const ScaleController& scale) {
-  // report command on user interface
+// callback function for commands
+void report_command () {
+  Serial.println("HERE!!!");
   Serial.println("INFO: scale command - " +
-    String(scale.command.type) + " " +
-    String(scale.command.variable) + " " +
-    String(scale.command.value));
-  /*
-  #ifdef ENABLE_DISPLAY
-    lcd.show_message(pump.command.type, pump.command.variable); // shown on lcd
-  #endif
-  #ifdef ENABLE_LOGGING
-    // log in google spreadsheet
-    gs.send(pump.command.type, pump.command.variable, pump.command.value, pump.command.units, pump.command.msg);
-  #endif
-  */
-  update_user_interface(scale.state);
+    String(scale->getCommand()->type) + " " +
+    String(scale->getCommand()->variable) + " " +
+    String(scale->getCommand()->value));
+  update_user_interface();
 }
-
-ScaleController scale(RESET_pin, state, report_scale_command);
-
 
 // device name
 char device_name[20];
@@ -108,17 +107,18 @@ void setup() {
   // serial
   Serial.begin(9600);
 
-  delay(3000);
+  delay(2000);
 
   // time // FIXME: allow for external setting of the time zone
   //Time.zone(-6); // Mountain Daylight Time -6 / Mountain Standard Time -7
 
   // scale
   Serial.println("INFO: initialize scale");
-  scale.init();
+  scale->setCommandCallback(report_command);
+  scale->init();
 
   // check for reset
-  if (scale.wasReset()) {
+  if (scale->wasReset()) {
     #ifdef ENABLE_DISPLAY
       lcd.print_line(1, "Resetting...");
       delay(1000);
@@ -127,7 +127,8 @@ void setup() {
 
   // user interface update
   Serial.println("INFO: updating user interface");
-  update_user_interface(scale.state);
+  //update_user_interface(scale.state);
+  update_user_interface();
 
   // connect device to cloud and register for listeners
   Serial.println("INFO: registering spark variables and connecting to cloud");
@@ -148,5 +149,5 @@ void loop() {
   #ifdef ENABLE_DISPLAY
     lcd.update();
   #endif
-  scale.update();
+  scale->update();
 }

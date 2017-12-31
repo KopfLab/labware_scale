@@ -38,9 +38,7 @@
 
 // command from spark cloud
 #define CMD_MAX_CHAR 63 //(spark.functions are limited to 63 char long call)
-class DeviceCommand {
-
-  public:
+struct DeviceCommand {
 
     // command message
     char command[CMD_MAX_CHAR];
@@ -56,18 +54,9 @@ class DeviceCommand {
 
     // constructors
     DeviceCommand() {};
-    DeviceCommand(String& command_string) {
-      command_string.toCharArray(command, sizeof(command));
-      strcpy(buffer, command);
-      strcpy(value, "");
-      strcpy(units, "");
-      strcpy(msg, "");
-
-      strcpy(type, CMD_LOG_TYPE_UNDEFINED);
-      ret_val = CMD_RET_UNDEFINED;
-    };
 
     // command parsing
+    void load(String& command_string);
     void extractParam(char* param, int size);
     void assignVariable();
     void assignValue();
@@ -77,6 +66,7 @@ class DeviceCommand {
     bool parseValue(char* cmd);
 
     // command status
+    bool isTypeDefined(); // whether the command type was found
     void success(bool state_changed);
     void success(bool state_changed, bool capture_message);
     void warning(); // not implemented yet
@@ -88,52 +78,18 @@ class DeviceCommand {
     void finalize();
 };
 
-/****** COMMAND STATUS *******/
-
-void DeviceCommand::success(bool state_changed) { success(state_changed, false); }
-void DeviceCommand::success(bool state_changed, bool capture_message) {
-  ret_val = CMD_RET_SUCCESS;
-  if (state_changed) {
-    strcpy(type, CMD_LOG_TYPE_STATE_CHANGED);
-  } else {
-    strcpy(type, CMD_LOG_TYPE_STATE_UNCHANGED);
-  }
-  if (capture_message) {
-    assignMessage();
-  }
-}
-
-void DeviceCommand::error(int code, char* text) {
-  ret_val = code;
-  strncpy(variable, text, sizeof(variable));
-  strcpy(type, CMD_LOG_TYPE_ERROR);
-  strcpy(msg, command); // store entire command in message
-}
-
-void DeviceCommand::error() {
-  error(CMD_RET_ERR, CMD_RET_ERR_TEXT);
-}
-
-void DeviceCommand::errorLocked() {
-  error(CMD_RET_ERR_LOCKED, CMD_RET_ERR_LOCKED_TEXT);
-}
-
-void DeviceCommand::errorCommand() {
-  error(CMD_RET_ERR_CMD, CMD_RET_ERR_CMD_TEXT);
-}
-
-void DeviceCommand::errorValue() {
-  error(CMD_RET_ERR_VAL, CMD_RET_ERR_VAL_TEXT);
-}
-
-// finalize the command
-void DeviceCommand::finalize() {
-  if (ret_val == CMD_RET_UNDEFINED) {
-    errorCommand();
-  }
-}
-
 /****** COMMAND PARSING *******/
+
+void DeviceCommand::load(String& command_string) {
+  command_string.toCharArray(command, sizeof(command));
+  strcpy(buffer, command);
+  strcpy(value, "");
+  strcpy(units, "");
+  strcpy(msg, "");
+
+  strcpy(type, CMD_LOG_TYPE_UNDEFINED);
+  ret_val = CMD_RET_UNDEFINED;
+}
 
 // capture command excerpt (until next space) in param
 // using char array pointers instead of String to make sure we don't get memory leaks here
@@ -194,4 +150,51 @@ bool DeviceCommand::parseValue(char* cmd) {
   } else {
     return(false);
   }
+}
+
+/****** COMMAND STATUS *******/
+
+bool DeviceCommand::isTypeDefined() {
+  return(ret_val != CMD_RET_UNDEFINED);
+}
+
+void DeviceCommand::success(bool state_changed) { success(state_changed, false); }
+void DeviceCommand::success(bool state_changed, bool capture_message) {
+  ret_val = CMD_RET_SUCCESS;
+  if (state_changed) {
+    strcpy(type, CMD_LOG_TYPE_STATE_CHANGED);
+  } else {
+    strcpy(type, CMD_LOG_TYPE_STATE_UNCHANGED);
+  }
+  if (capture_message) {
+    assignMessage();
+  }
+}
+
+void DeviceCommand::error(int code, char* text) {
+  ret_val = code;
+  strncpy(variable, text, sizeof(variable));
+  strcpy(type, CMD_LOG_TYPE_ERROR);
+  strcpy(msg, command); // store entire command in message
+}
+
+void DeviceCommand::error() {
+  error(CMD_RET_ERR, CMD_RET_ERR_TEXT);
+}
+
+void DeviceCommand::errorLocked() {
+  error(CMD_RET_ERR_LOCKED, CMD_RET_ERR_LOCKED_TEXT);
+}
+
+void DeviceCommand::errorCommand() {
+  error(CMD_RET_ERR_CMD, CMD_RET_ERR_CMD_TEXT);
+}
+
+void DeviceCommand::errorValue() {
+  error(CMD_RET_ERR_VAL, CMD_RET_ERR_VAL_TEXT);
+}
+
+// finalize the command
+void DeviceCommand::finalize() {
+  if (!isTypeDefined()) errorCommand();
 }

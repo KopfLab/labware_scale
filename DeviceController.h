@@ -1,4 +1,5 @@
 #pragma once
+#include "DeviceState.h"
 
 // controller class
 class DeviceController {
@@ -9,15 +10,19 @@ class DeviceController {
     const int reset_pin;
     bool reset = false;
 
-    // state (re-implement in derived classes if state structure changes)
-    DeviceState state;
-    DeviceState *ds = &state;
+  protected:
+
+    // command
+    DeviceCommand command;
+
+    // call back
+    void (*command_callback)();
 
   public:
 
     // constructor
-    DeviceController (int reset_pin) :
-        reset_pin(reset_pin) {}
+    DeviceController();
+    DeviceController (int reset_pin) : reset_pin(reset_pin) {}
 
     // setup and loop methods
     void init(); // to be run during setup()
@@ -26,17 +31,24 @@ class DeviceController {
     // reset
     bool wasReset() { reset; }; // whether controller was started in reset mode
 
-    // state control functions (re-implement in derived classes if state structure changes)
-    virtual DeviceState* getDS(); // fetch the device state pointer (overwrite in derive class)
-    virtual void saveDS(); // save device state to EEPROM (implement in derived class)
-    virtual bool restoreDS(); // load device state from EEPROM
+    // state control & persistence functions (implement in derived classes)
+    virtual DeviceState* getDS() = 0; // fetch the device state pointer
+    virtual void saveDS() = 0; // save device state to EEPROM
+    virtual bool restoreDS() = 0; // load device state from EEPROM
 
     // state change functions (will work in derived classes as long as getDS() is re-implemented)
     bool changeLocked(bool on);
     bool changeStateLogging(bool on);
     bool changeTimezone(int tz);
 
-    virtual int parseCommand (String command){} // parse a cloud command
+    // particle command parsing functions
+    virtual void registerCommand() = 0; // register the particle function (implement in derived classes)
+    DeviceCommand* getCommand(); // get pointer to the command object
+    void setCommandCallback(void (*cb)()); // assign a callback function
+    void callCommandCallback(); // call the callback
+    bool parseLocked();
+    bool parseStateLogging();
+    bool parseTimezone();
 };
 
 /* SETUP & LOOP */
@@ -45,7 +57,10 @@ void DeviceController::init() {
   // define pins
   pinMode(reset_pin, INPUT_PULLDOWN);
 
-  //  check for eset
+  // register particle function
+  registerCommand();
+
+  //  check for reset
   if(digitalRead(reset_pin) == HIGH) {
     reset = true;
     Serial.println("INFO: reset request detected");
@@ -67,31 +82,6 @@ void DeviceController::init() {
 
 void DeviceController::update() {
   // nothing happens in default loop
-}
-
-/* DEVICE STATE FUNCTIONS */
-
-DeviceState* DeviceController::getDS() {
-  return(ds);
-}
-
-void DeviceController::saveDS() {
-  EEPROM.put(STATE_ADDRESS, state);
-  Serial.println("INFO: device state saved in memory (if any updates were necessary)");
-}
-
-bool DeviceController::restoreDS(){
-  DeviceState saved_state;
-  EEPROM.get(STATE_ADDRESS, saved_state);
-  bool recoverable = saved_state.version == STATE_VERSION;
-  if(recoverable) {
-    EEPROM.get(STATE_ADDRESS, state);
-    Serial.println("INFO: successfully restored device state from memory (version " + String(STATE_VERSION) + ")");
-  } else {
-    Serial.println("INFO: could not restore device state from memory (found version " + String(saved_state.version) + "), sticking with initial default");
-    saveDS();
-  }
-  return(recoverable);
 }
 
 /* DEVICE STATE CHANGE FUNCTIONS */
@@ -138,4 +128,58 @@ bool DeviceController::changeTimezone (int tz) {
     Serial.println("INFO: timezone unchanged (" + String(getDS()->timezone) + ")");
   }
   return(changed);
+}
+
+/* COMMAND PARSING FUNCTIONS */
+
+DeviceCommand* DeviceController::getCommand() {
+  return(&command);
+}
+
+void DeviceController::setCommandCallback(void (*cb)()) {
+  command_callback = cb;
+}
+
+void DeviceController::callCommandCallback() {
+  if (command_callback) command_callback();
+}
+
+bool DeviceController::parseLocked() {
+  // decision tree
+  if (command.parseVariable(CMD_LOCK)) {
+    // locking
+    command.assignValue();
+    if (command.parseValue(CMD_LOCK_ON)) {
+      command.success(changeLocked(true), true);
+    } else if (command.parseValue(CMD_LOCK_OFF)) {
+      command.success(changeLocked(false), true);
+    }
+  } else if (getDS()->locked) {
+    // device is locked --> no other commands allowed
+    command.errorLocked();
+  }
+  return(command.isTypeDefined());
+}
+
+bool DeviceController::parseStateLogging() {
+  if (command.parseVariable(CMD_STATE_LOG)) {
+    // state logging
+    command.assignValue();
+    if (command.parseValue(CMD_STATE_LOG_ON)) {
+      command.success(changeStateLogging(true), true);
+    } else if (command.parseValue(CMD_STATE_LOG_OFF)) {
+      command.success(changeStateLogging(false), true);
+    }
+  }
+  return(command.isTypeDefined());
+}
+
+bool DeviceController::parseTimezone() {
+  if (command.parseVariable(CMD_TIMEZONE)) {
+    // timezone
+    command.assignValue();
+    int tz = atoi(command.value);
+    (tz >= -12 && tz <= 14) ? command.success(changeTimezone(tz)) : command.errorValue();
+  }
+  return(command.isTypeDefined());
 }
