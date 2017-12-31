@@ -6,7 +6,7 @@
 
 #pragma once
 #include "ScaleState.h"
-#include "DeviceCommands.h"
+#include "ScaleCommands.h"
 #include "DeviceController.h"
 
 // controller class
@@ -17,6 +17,7 @@ class ScaleController : public DeviceController {
 
     // state
     ScaleState state;
+    DeviceState *ds = &state;
 
     // command
     DeviceCommand command;
@@ -36,14 +37,38 @@ class ScaleController : public DeviceController {
     }
     void update(); // to be run during loop()
 
+    // state
+    DeviceState* getDS() { return(ds); };
+
+    // save device state to EEPROM
+    void saveDS() {
+      Serial.println("DERIVED SAVE DS");
+      EEPROM.put(STATE_ADDRESS, state);
+      Serial.println("INFO: scale state saved in memory (if any updates were necessary)");
+    }
+    
+    // load device state from EEPROM
+    bool restoreDS(){
+      Serial.println("DERIVED LOAD DS");
+      ScaleState saved_state;
+      EEPROM.get(STATE_ADDRESS, saved_state);
+      bool recoverable = saved_state.version == STATE_VERSION;
+      if(recoverable) {
+        EEPROM.get(STATE_ADDRESS, state);
+        Serial.println("INFO: successfully restored state from memory (version " + String(STATE_VERSION) + ")");
+      } else {
+        Serial.println("INFO: could not restore state from memory (found version " + String(saved_state.version) + "), sticking with initial default");
+        saveDS();
+      }
+      return(recoverable);
+    }
+
+
     // data logging
-    void setReadPeriod(int period);
+    bool changeReadPeriod(int period);
     void setLogPeriod(int period);
 
     // commands
-    void restoreState() {
-      state.load();
-    }
     int parseCommand (String command); // parse a cloud command
 
   // scale command callback
@@ -64,16 +89,24 @@ void ScaleController::update() {
 
 /**** CHANGING STATE ****/
 
-void ScaleController::setReadPeriod(int period) {
-  Serial.println("INFO: setting read period to " + String(period) + " seconds");
-  state.read_period = period;
-  state.save();
+// read period
+bool ScaleController::changeReadPeriod(int period) {
+  bool changed = period != state.read_period;
+
+  if (changed) {
+    state.read_period = period;
+    Serial.println("INFO: setting read period to " + String(period) + " seconds");
+    saveDS();
+  } else {
+    Serial.println("INFO: read period unchanged (" + String(period) + ")");
+  }
+  return(changed);
 }
 
 void ScaleController::setLogPeriod(int period) {
   Serial.println("INFO: setting log period to " + String(period) + " seconds");
   state.log_period = period;
-  state.save();
+  saveDS();
 }
 
 
@@ -89,9 +122,9 @@ int ScaleController::parseCommand(String command_string) {
     // locking
     command.assignValue();
     if (command.parseValue(CMD_LOCK_ON)) {
-      command.success(state.changeLocked(true), true);
+      command.success(changeLocked(true), true);
     } else if (command.parseValue(CMD_LOCK_OFF)) {
-      command.success(state.changeLocked(false), true);
+      command.success(changeLocked(false), true);
     }
   } else if (state.locked) {
     // device is locked --> no other commands allowed
@@ -100,18 +133,20 @@ int ScaleController::parseCommand(String command_string) {
     // state logging
     command.assignValue();
     if (command.parseValue(CMD_STATE_LOG_ON)) {
-      command.success(state.changeStateLogging(true), true);
+      command.success(changeStateLogging(true), true);
     } else if (command.parseValue(CMD_STATE_LOG_OFF)) {
-      command.success(state.changeStateLogging(false), true);
+      command.success(changeStateLogging(false), true);
     }
   } else if (command.parseVariable(CMD_TIMEZONE)) {
     // timezone
     command.assignValue();
     int tz = atoi(command.value);
-    if (tz < -12 || tz > 14) {
-      command.error(CMD_RET_ERR_TZ, CMD_RET_ERR_TZ_TEXT);
-    }
-    command.success(state.changeTimezone(tz));
+    (tz >= -12 && tz <= 14) ? command.success(changeTimezone(tz)) : command.errorValue();
+  } else if (command.parseVariable(CMD_READ_PERIOD)) {
+    // read period
+    command.assignValue();
+    int period = atoi(command.value);
+    (period >= 0) ? command.success(changeReadPeriod(period)) : command.errorValue();
   } else {
     // other commands
   }

@@ -41,14 +41,15 @@ char locked_web[20];
 void update_user_interface (ScaleState state) {
 
   // user interface update text
-  get_scale_state_logging_info(state.logging, logging_lcd, sizeof(logging_lcd), logging_web, sizeof(logging_web));
-  get_scale_state_locked_info(state.locked, locked_lcd, sizeof(locked_lcd), locked_web, sizeof(locked_web));
+  //get_scale_state_logging_info(state.logging, logging_lcd, sizeof(logging_lcd), logging_web, sizeof(logging_web));
+  //get_scale_state_locked_info(state.locked, locked_lcd, sizeof(locked_lcd), locked_web, sizeof(locked_web));
 
   // serial (for debugging)
-  Serial.println("@UI - Logging: " + String(logging_lcd));
-  Serial.println("@UI - Locked: " + String(locked_lcd));
+  Serial.println("@UI - Locked: " + String(state.locked));
+  Serial.println("@UI - Logging: " + String(state.state_logging));
   Serial.println("@UI - Period: " + String(state.log_period));
   Serial.println("@UI - Read: " + String(state.read_period));
+  Serial.println("@UI - Timezone: " + String(state.timezone));
 
   // lcd
   /*
@@ -117,7 +118,7 @@ void setup() {
   scale.init();
 
   // check for reset
-  if (scale.reset) {
+  if (scale.wasReset()) {
     #ifdef ENABLE_DISPLAY
       lcd.print_line(1, "Resetting...");
       delay(1000);

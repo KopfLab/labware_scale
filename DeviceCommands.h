@@ -6,12 +6,12 @@
 #define CMD_RET_WARN             1 // warnings > 0
 #define CMD_RET_ERR             -1 // errors < 0
 #define CMD_RET_ERR_TEXT        "undefined error"
-#define CMD_RET_ERR_CMD         -2 // error unknown command
-#define CMD_RET_ERR_CMD_TEXT    "invalid command"
-#define CMD_RET_ERR_LOCKED      -3 // error locked
+#define CMD_RET_ERR_LOCKED      -2 // error locked
 #define CMD_RET_ERR_LOCKED_TEXT "locked"
-#define CMD_RET_ERR_TZ          -4 // invalid timezone
-#define CMD_RET_ERR_TZ_TEXT     "invalid timezone"
+#define CMD_RET_ERR_CMD         -3 // invalid command
+#define CMD_RET_ERR_CMD_TEXT    "invalid command"
+#define CMD_RET_ERR_VAL         -4 // invalid value
+#define CMD_RET_ERR_VAL_TEXT    "invalid value"
 
 // command log types
 #define CMD_LOG_TYPE_UNDEFINED        "undefined"
@@ -83,6 +83,8 @@ class DeviceCommand {
     void error(int code, char* text);
     void error();
     void errorLocked();
+    void errorCommand();
+    void errorValue();
     void finalize();
 };
 
@@ -116,10 +118,18 @@ void DeviceCommand::errorLocked() {
   error(CMD_RET_ERR_LOCKED, CMD_RET_ERR_LOCKED_TEXT);
 }
 
+void DeviceCommand::errorCommand() {
+  error(CMD_RET_ERR_CMD, CMD_RET_ERR_CMD_TEXT);
+}
+
+void DeviceCommand::errorValue() {
+  error(CMD_RET_ERR_VAL, CMD_RET_ERR_VAL_TEXT);
+}
+
 // finalize the command
 void DeviceCommand::finalize() {
   if (ret_val == CMD_RET_UNDEFINED) {
-    error(CMD_RET_ERR_CMD, CMD_RET_ERR_CMD_TEXT);
+    errorCommand();
   }
 }
 
