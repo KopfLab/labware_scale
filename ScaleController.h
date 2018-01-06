@@ -99,12 +99,17 @@ bool ScaleController::parseDataLoggingPeriod() {
   if (command.parseVariable(CMD_DATA_LOG_PERIOD)) {
     // parse read period
     command.extractValue();
-    int period = atoi(command.value);
-    if (period >= 0) {
-      command.success(changeDataLoggingPeriod(period));
-      strcpy(command.units, "seconds");
+    if (command.parseValue(CMD_DATA_LOG_PERIOD_MANUAL)){
+      // manual logging
+      command.success(changeDataLoggingPeriod(0));
     } else {
-      command.errorValue();
+      int period = atoi(command.value);
+      if (period > 0) {
+        command.success(changeDataLoggingPeriod(period));
+        strcpy(command.units, "seconds");
+      } else {
+        command.errorValue();
+      }
     }
     getStateDataLoggingPeriodText(state->data_logging_period, command.data, sizeof(command.data));
   }
