@@ -7,7 +7,7 @@
 #pragma once
 #include "ScaleState.h"
 #include "ScaleCommands.h"
-#include "DeviceController.h"
+#include "device/DeviceController.h"
 
 // controller class
 class ScaleController : public DeviceController {

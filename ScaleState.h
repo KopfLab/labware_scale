@@ -1,5 +1,5 @@
 #pragma once
-#include "DeviceState.h"
+#include "device/DeviceState.h"
 #include "ScaleCommands.h"
 
 // scale state
