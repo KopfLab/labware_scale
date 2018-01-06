@@ -1,4 +1,10 @@
+// NOTE: consider extracting the log part from the command and keep as a separate class
+// would make it easier to use for logging start-up and other extra-ordinatory events
 #pragma once
+#include "DeviceInfo.h"
+
+// particle log webhook
+#define LOG_WEBHOOK  "device_state_log"  // name of the webhoook name
 
 // return codes:
 //  -  0 : success without warning
@@ -44,7 +50,8 @@
 #define CMD_TIMEZONE        "tz"
 
 // command from spark cloud
-#define CMD_MAX_CHAR 63 //(spark.functions are limited to 63 char long call)
+#define CMD_MAX_CHAR 63       // spark.functions are limited to 63 char long call
+#define LOG_MAX_CHAR 255      // spark.publish is limited to 255 chars of data
 struct DeviceCommand {
 
     // command message
@@ -56,20 +63,25 @@ struct DeviceCommand {
     char notes[CMD_MAX_CHAR];
 
     // command outcome
+    char device[20];
     char type[20]; // command type
-    char msg[50]; // message from device to logger
+    char msg[50]; // log message
+    char data[50]; // data text
+    char cmd_log[LOG_MAX_CHAR]; // full log text (max size limited by Particle.publish())
     int ret_val; // return value
 
     // constructors
     DeviceCommand() {};
 
-    // command parsing
+    // command extraction
     void load(String& command_string);
     void extractParam(char* param, int size);
-    void assignVariable();
-    void assignValue();
-    void assignUnits();
+    void extractVariable();
+    void extractValue();
+    void extractUnits();
     void assignNotes();
+
+    // command parsing
     bool parseVariable(char* cmd);
     bool parseValue(char* cmd);
 
@@ -83,8 +95,21 @@ struct DeviceCommand {
     void errorLocked();
     void errorCommand();
     void errorValue();
-    void finalize();
+
+    // logging and finalizing command
+    void setLogMsg(char* log_msg); // set a log message
+    void assembleLog(); // assemble log
+    bool publishLog(); // send log to cloud
+    void finalize(bool publish); // finalize command (publish = whether to publish log)
+
+    // other speciality commands
+    void makeStartupLog();
 };
+
+void DeviceCommand::makeStartupLog() {
+  strcpy(type, "startup");
+  getStateKeyValue(data, sizeof(data), "startup", "complete", PATTERN_KV_JSON_QUOTED);
+}
 
 /****** COMMAND PARSING *******/
 
@@ -97,6 +122,8 @@ void DeviceCommand::load(String& command_string) {
 
   strcpy(type, CMD_LOG_TYPE_UNDEFINED);
   msg[0] = 0;
+  data[0] = 0;
+  cmd_log[0] = 0;
   ret_val = CMD_RET_UNDEFINED;
 }
 
@@ -124,17 +151,17 @@ void DeviceCommand::extractParam(char* param, int size) {
 }
 
 // assigns the next extractable parameter to variable
-void DeviceCommand::assignVariable() {
+void DeviceCommand::extractVariable() {
   extractParam(variable, sizeof(variable));
 }
 
 // assigns the next extractable paramter to value
-void DeviceCommand::assignValue() {
+void DeviceCommand::extractValue() {
   extractParam(value, sizeof(value));
 }
 
 // assigns the next extractable parameter to units
-void DeviceCommand::assignUnits() {
+void DeviceCommand::extractUnits() {
   extractParam(units, sizeof(units));
 }
 
@@ -184,14 +211,14 @@ void DeviceCommand::success(bool state_changed, bool capture_notes) {
 void DeviceCommand::warning(int code, char* text) {
   // warning affects return code and adds warning message
   ret_val = code;
-  strncpy(msg, text, sizeof(variable));
+  setLogMsg(text);
 }
 
 void DeviceCommand::error(int code, char* text) {
   // error changes type and stores entire command in notes
   ret_val = code;
-  strncpy(msg, text, sizeof(variable));
-  strncpy(type, CMD_LOG_TYPE_ERROR, sizeof(type));
+  setLogMsg(text);
+  strncpy(type, CMD_LOG_TYPE_ERROR, sizeof(type) - 1);
   strcpy(notes, command); // store entire command in notes
 }
 
@@ -211,7 +238,37 @@ void DeviceCommand::errorValue() {
   error(CMD_RET_ERR_VAL, CMD_RET_ERR_VAL_TEXT);
 }
 
-// finalize the command
-void DeviceCommand::finalize() {
+/****** LOGGING & FINALIZING *******/
+
+void DeviceCommand::setLogMsg(char* log_msg) {
+  strncpy(msg, log_msg, sizeof(msg) - 1);
+  msg[sizeof(msg)-1] = 0;
+}
+
+void DeviceCommand::assembleLog() {
+  if (data[0] == 0) {
+    // add empty data entry
+    strcpy(data, "{}");
+  }
+  snprintf(cmd_log, sizeof(cmd_log),
+     "{\"name\":\"%s\",\"type\":\"%s\",\"data\":[%s],\"msg\":\"%s\",\"notes\":\"%s\"}",
+     device, type, data, msg, notes);
+  Serial.println("INFO: log = " + String(cmd_log));
+}
+
+bool DeviceCommand::publishLog() {
+  Serial.print("INFO: publishing log to event '" + String(LOG_WEBHOOK) + "'... ");
+  if(Particle.publish(LOG_WEBHOOK, cmd_log, PRIVATE, WITH_ACK)) {
+    Serial.println("successful.");
+    return(true);
+  } else {
+    Serial.println("failed!");
+    return(false);
+  }
+}
+
+void DeviceCommand::finalize(bool publish) {
   if (!isTypeDefined()) errorCommand();
+  assembleLog();
+  if (publish) publishLog();
 }

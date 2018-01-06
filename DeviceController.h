@@ -1,5 +1,6 @@
 #pragma once
 #include "DeviceState.h"
+#include "DeviceInfo.h"
 
 // controller class
 #define STATE_INFO_MAX_CHAR   600 // how long is the state information maximally
@@ -11,8 +12,13 @@ class DeviceController {
     const int reset_pin;
     bool reset = false;
 
+    // state log exceptions
+    bool overwrite_state_log = false;
+
     // device info
     bool name_handler_registered = false;
+    bool name_handler_succeeded = false;
+    bool startup_logged = false;
     char state_information_buffer[STATE_INFO_MAX_CHAR-2];
 
     // call backs
@@ -114,12 +120,27 @@ void DeviceController::update() {
     Serial.println("INFO: name handler registered");
   }
 
+  // startup log
+  if (!startup_logged && name_handler_succeeded) {
+    if (getDS()->state_logging) {
+      Serial.println("INFO: start-up completed... logging...");
+      DeviceCommand startup;
+      startup.makeStartupLog();
+      startup.finalize(true);
+    } else {
+      Serial.println("INFO: start-up completed (not logged).");
+    }
+    startup_logged = true;
+  }
 }
 
 /* DEVICE NAME */
 
 void DeviceController::captureName(const char *topic, const char *data) {
+  // store name and also assign it to device information
   strncpy ( name, data, sizeof(name) );
+  strncpy ( command.device, data, sizeof(command.device));
+  name_handler_succeeded = true;
   Serial.println("INFO: device name " + String(name));
   if (name_callback) name_callback();
 }
@@ -135,7 +156,7 @@ void DeviceController::updateStateInformation() {
   Serial.print("INFO: updating state information: ");
   state_information_buffer[0] = 0; // reset buffer
   assembleStateInformation();
-  snprintf(state_information, sizeof(state_information), "{%s}", state_information_buffer);
+  snprintf(state_information, sizeof(state_information), "[%s]", state_information_buffer);
   Serial.println(state_information);
 }
 
@@ -154,10 +175,10 @@ void DeviceController::addToStateInformation(char* info, char* sep) {
 
 void DeviceController::assembleStateInformation() {
   char pair[60];
-  getStateTimezoneText(getDS()->timezone, pair, sizeof(pair), false); addToStateInformation(pair);
-  getStateLockedText(getDS()->locked, pair, sizeof(pair), false); addToStateInformation(pair);
-  getStateStateLoggingText(getDS()->state_logging, pair, sizeof(pair), false); addToStateInformation(pair);
-  getStateDataLoggingText(getDS()->data_logging, pair, sizeof(pair), false); addToStateInformation(pair);
+  getStateTimezoneText(getDS()->timezone, pair, sizeof(pair)); addToStateInformation(pair);
+  getStateLockedText(getDS()->locked, pair, sizeof(pair)); addToStateInformation(pair);
+  getStateStateLoggingText(getDS()->state_logging, pair, sizeof(pair)); addToStateInformation(pair);
+  getStateDataLoggingText(getDS()->data_logging, pair, sizeof(pair)); addToStateInformation(pair);
 }
 
 /* DEVICE STATE CHANGE FUNCTIONS */
@@ -183,6 +204,7 @@ bool DeviceController::changeStateLogging (bool on) {
   if (changed) {
     getDS()->state_logging = on;
     on ? Serial.println("INFO: state logging turned on") : Serial.println("INFO: state logging turned off");
+    overwrite_state_log = true; // always log this event no matter what
     saveDS();
   } else {
     on ? Serial.println("INFO: state logging already on") : Serial.println("INFO: state logging already off");
@@ -234,12 +256,13 @@ bool DeviceController::parseLocked() {
   // decision tree
   if (command.parseVariable(CMD_LOCK)) {
     // locking
-    command.assignValue();
+    command.extractValue();
     if (command.parseValue(CMD_LOCK_ON)) {
       command.success(changeLocked(true));
     } else if (command.parseValue(CMD_LOCK_OFF)) {
       command.success(changeLocked(false));
     }
+    getStateLockedText(getDS()->locked, command.data, sizeof(command.data));
   } else if (getDS()->locked) {
     // device is locked --> no other commands allowed
     command.errorLocked();
@@ -250,12 +273,13 @@ bool DeviceController::parseLocked() {
 bool DeviceController::parseStateLogging() {
   if (command.parseVariable(CMD_STATE_LOG)) {
     // state logging
-    command.assignValue();
+    command.extractValue();
     if (command.parseValue(CMD_STATE_LOG_ON)) {
       command.success(changeStateLogging(true));
     } else if (command.parseValue(CMD_STATE_LOG_OFF)) {
       command.success(changeStateLogging(false));
     }
+    getStateStateLoggingText(getDS()->state_logging, command.data, sizeof(command.data));
   }
   return(command.isTypeDefined());
 }
@@ -263,12 +287,13 @@ bool DeviceController::parseStateLogging() {
 bool DeviceController::parseDataLogging() {
   if (command.parseVariable(CMD_DATA_LOG)) {
     // state logging
-    command.assignValue();
+    command.extractValue();
     if (command.parseValue(CMD_DATA_LOG_ON)) {
       command.success(changeDataLogging(true));
     } else if (command.parseValue(CMD_DATA_LOG_OFF)) {
       command.success(changeDataLogging(false));
     }
+    getStateDataLoggingText(getDS()->data_logging, command.data, sizeof(command.data));
   }
   return(command.isTypeDefined());
 }
@@ -276,9 +301,10 @@ bool DeviceController::parseDataLogging() {
 bool DeviceController::parseTimezone() {
   if (command.parseVariable(CMD_TIMEZONE)) {
     // timezone
-    command.assignValue();
+    command.extractValue();
     int tz = atoi(command.value);
     (tz >= -12 && tz <= 14) ? command.success(changeTimezone(tz)) : command.errorValue();
+    getStateTimezoneText(getDS()->timezone, command.data, sizeof(command.data));
   }
   return(command.isTypeDefined());
 }
@@ -289,9 +315,10 @@ int DeviceController::receiveCommand(String command_string) {
 
   // load, parse and finalize command
   command.load(command_string);
-  command.assignVariable();
+  command.extractVariable();
   parseCommand();
-  command.finalize();
+  command.finalize(getDS()->state_logging | overwrite_state_log);
+  overwrite_state_log = false;
 
   // state information
   if (command.ret_val >= CMD_RET_SUCCESS && command.ret_val != CMD_RET_WARN_NO_CHANGE) {

@@ -98,7 +98,7 @@ bool ScaleController::changeDataLoggingPeriod(int period) {
 bool ScaleController::parseDataLoggingPeriod() {
   if (command.parseVariable(CMD_DATA_LOG_PERIOD)) {
     // parse read period
-    command.assignValue();
+    command.extractValue();
     int period = atoi(command.value);
     if (period >= 0) {
       command.success(changeDataLoggingPeriod(period));
@@ -106,6 +106,7 @@ bool ScaleController::parseDataLoggingPeriod() {
     } else {
       command.errorValue();
     }
+    getStateDataLoggingPeriodText(state->data_logging_period, command.data, sizeof(command.data));
   }
   return(command.isTypeDefined());
 }
@@ -115,7 +116,7 @@ bool ScaleController::parseDataLoggingPeriod() {
 void ScaleController::assembleStateInformation() {
   DeviceController::assembleStateInformation();
   char pair[60];
-  getStateDataLoggingPeriodText(state->data_logging_period, pair, sizeof(pair), false); addToStateInformation(pair);
+  getStateDataLoggingPeriodText(state->data_logging_period, pair, sizeof(pair)); addToStateInformation(pair);
   // FIXME: continue here
 }
 

@@ -22,7 +22,7 @@ void TimeSync::init() {
 
 void TimeSync::update() {
   // time sync
-  if ( (millis() - last_sync > sync_period || millis() < last_sync ) && Particle.connected()) {
+  if ( (millis() - last_sync > sync_period || millis() < last_sync ) && Particle.connected() && !Particle.syncTimePending()) {
       // Request time synchronization from the Particle Cloud
       Particle.syncTime();
       last_sync = millis();
