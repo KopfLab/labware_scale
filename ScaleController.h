@@ -7,10 +7,15 @@
 #pragma once
 #include "ScaleState.h"
 #include "ScaleCommands.h"
-#include "device/DeviceController.h"
+#include "ScaleData.h"
+#include "device/DeviceControllerSerial.h"
+
+// serial communication constants
+#define SCALE_DATA_REQUEST  "#" // data request command
+
 
 // controller class
-class ScaleController : public DeviceController {
+class ScaleController : public DeviceControllerSerial {
 
   private:
 
@@ -18,15 +23,42 @@ class ScaleController : public DeviceController {
     ScaleState *state;
     DeviceState *ds = state;
 
+    // data
+    ScaleData *data;
+
+    /**** serial communication *****/
+    // pattern pieces
+    const int P_VAL = 1; // [ +-0-9]
+    const int P_UNIT = 2; // [GOC]
+    const int P_STABLE = 3; // [ S]
+
+    // specific ascii characters (actual byte values)
+    const int B_SPACE = 32; // \\s
+    const int B_CR = 13; // \r
+    const int B_NL = 10; // \n
+    const int B_0 = 48; // 0
+    const int B_9 = 57; // 9
+
+    // overall data pattern
+    int data_pattern[20];
+    int data_pattern_size;
+    int data_pattern_pos;
+
   public:
 
     // constructors
     ScaleController();
-    ScaleController (int reset_pin, ScaleState *state) : DeviceController(reset_pin), state(state) {}
+    ScaleController (int reset_pin, const long baud_rate, const long serial_config, const int request_wait, const int error_wait, ScaleState *state, ScaleData *data) :
+      DeviceControllerSerial(reset_pin, baud_rate, serial_config, request_wait, error_wait), state(state), data(data) {
+        const int pattern[] = {P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, B_SPACE, B_SPACE, P_UNIT, P_STABLE, B_CR};
+        data_pattern_size = sizeof(pattern) / sizeof(pattern[0]) - 1;
+        for (int i=0; i < data_pattern_size; i++) data_pattern[i] = pattern[i];
+      }
 
     // setup and loop methods
-    void init();
-    void update(); // to be run during loop()
+    void startSerialData();
+    int processSerialData(byte b);
+    void completeSerialData();
 
     // state
     DeviceState* getDS() { return(ds); }; // return device state
@@ -44,17 +76,144 @@ class ScaleController : public DeviceController {
 
 /**** SETUP & LOOP ****/
 
-// init function
-void ScaleController::init() {
-  DeviceController::init();
+
+
+/**** SERIAL COMMUNICATION ****/
+
+void ScaleController::startSerialData() {
+  data->resetBuffers();
+  data->storeReceivedDataTime(millis());
+  data_pattern_pos = 0;
 }
 
+int ScaleController::processSerialData(byte b) {
+
+  char c = (char) b;
+  if ( data_pattern[data_pattern_pos] == P_VAL && ( (b >= B_0 && b <= B_9) || c == ' ' || c == '+' || c == '-' || c == '.') ) {
+    // value (ignoring spaces)
+    if (b != B_SPACE) data->appendToValueBuffer(b);
+  } else if (data_pattern[data_pattern_pos] == P_UNIT && (c == 'G' || c == 'O' || c == 'C')) {
+    // units
+  } else if (data_pattern[data_pattern_pos] == P_STABLE && (c == 'S' || c == ' ')) {
+    // reading stable?
+  } else if (data_pattern[data_pattern_pos] == B_SPACE && b == B_SPACE) {
+    // space
+  } else if (data_pattern[data_pattern_pos] == B_CR && b == B_CR) {
+    // carriage return
+  } else {
+    // unrecognized part of data --> error
+    return(SERIAL_DATA_ERROR);
+  }
+
+  // next data pattern position
+  data_pattern_pos++;
+
+  // message complete
+  if (data_pattern_pos == data_pattern_size) {
+    return(SERIAL_DATA_COMPLETE);
+  }
+
+  return(SERIAL_DATA_WAITING);
+}
+
+void ScaleController::completeSerialData() {
+  data->storeValue();
+  data->setValue(true); // average
+  data->resetBuffers();
+  data->assembleLog();
+}
+
+/*
 // loop function
 void ScaleController::update() {
   DeviceController::update();
-  // FIXME: implement
-  // do the data reading and do the data logging if logs are on
+
+  // FIXME: some of the stuff after this could be abstracted into a new DeviceControllerSerial class
+
+  // check serial communication
+  while (Serial1.available()) {
+    byte b = Serial1.read();
+
+
+    // if error --> allow time to empty the serial buffer
+    if (data_error) last_error = millis();
+
+    // if not waiting for response
+    if (data_error || !waiting_for_response) continue;
+
+    // proces byte
+    if (!processSerialData(b)) {
+      data_error = true;
+      Serial.print("WARNING - unexpected character at pattern_pos " + String(pattern_pos) + ": ");
+      Serial.print(b);
+      Serial.print(" = ");
+      Serial.println((char) b);
+    }
+
+    // message complete
+    if (pattern_pos == pattern_size) {
+      data_received = true;
+    }
+  }
+
+  // message completely received
+  if (waiting_for_response && data_received) {
+    Serial.println("INFO: data reading complete");
+    data->storeValue();
+    data->setValue(true); // average
+    data->resetBuffers();
+    data->assembleLog();
+    waiting_for_response = false;
+  }
+
+  // error
+  if (waiting_for_response && data_error) {
+    Serial.println("INFO: encountered data error -- resetting");
+    data->resetBuffers();
+    last_error = millis();
+    temp_message = "";
+    waiting_for_response = false;
+  }
+
+  // data request: if not currently waiting for a response and
+  //   - either there was an error and and it's past the error reset time
+  //   - or if it's data logging time
+  //   - or if it's on manual request mode
+  bool request_data =
+    !waiting_for_response &&
+    (
+      (data_error && millis() - last_error > ERROR_RESET_TIME) ||
+      (state->data_logging_period > 0 && millis() > last_read + read_period) ||
+      (state->data_logging_period == 0)
+    );
+
+
+  // (re)-request information from scale
+  if (request_data){
+
+    // datetime
+    char date_time_buffer[21];
+    Time.format(Time.now(), "%Y-%m-%d %H:%M:%S").toCharArray(date_time_buffer, sizeof(date_time_buffer));
+    Serial.print("INFO: ");
+    Serial.print(date_time_buffer);
+    if (state->data_logging_period == 0) {
+      // manual logging?
+      Serial.println(" - listening to manual data transmission from scale...");
+    } else {
+      // data request
+      Serial.println(" - issuing request for data to scale.");
+      Serial1.println(SCALE_DATA_REQUEST);
+    }
+
+    // request parameters
+    last_read = millis();
+    waiting_for_response = true;
+    data_received = false;
+    data_error = false;
+    pattern_pos = 0;
+  }
 }
+*/
 
 /**** STATE PERSISTENCE ****/
 
