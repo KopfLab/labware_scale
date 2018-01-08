@@ -24,26 +24,26 @@ Display lcd (
 
 // initial state of the scale
 ScaleState* state = new ScaleState(
-  /* timezone */                 -6, // Mountain Daylight Time -6 / Mountain Standard Time -7
+  /* timezone */              -6, // Mountain Daylight Time -6 / Mountain Standard Time -7
   /* locked */                false,
   /* state_logging */         true,
   /* data_logging */          false,
-  /* data_logging_period */      70 // in seconds
+  /* data_logging_period */   70 // in seconds
 );
+
+// data store in scale
+ScaleData* data = new ScaleData();
 
 // scale controller
 ScaleController* scale = new ScaleController(
   /* reset pin */         A5,
-  /* pointer to state */  state
+  /* baud rate */         4800,
+  /* serial config */     SERIAL_8N1,
+  /* request wait */      5000,
+  /* error wait */        500,
+  /* pointer to state */  state,
+  /* pointer to data */   data
 );
-
-// state information & function to update the user interface(s) based on changes in the state
-//char state_information[600] = "";
-
-char logging_lcd[7];
-char logging_web[20];
-char locked_lcd[6];
-char locked_web[20];
 
 // user interface update
 void update_user_interface () {

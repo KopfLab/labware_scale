@@ -28,9 +28,10 @@ class ScaleController : public DeviceControllerSerial {
 
     /**** serial communication *****/
     // pattern pieces
-    const int P_VAL = 1; // [ +-0-9]
-    const int P_UNIT = 2; // [GOC]
-    const int P_STABLE = 3; // [ S]
+    const int P_VAL = -1; // [ +-0-9]
+    const int P_UNIT = -2; // [GOC]
+    const int P_STABLE = -3; // [ S]
+    const int P_BYTE = 0; // anything > 0 is specific byte
 
     // specific ascii characters (actual byte values)
     const int B_SPACE = 32; // \\s
@@ -49,13 +50,14 @@ class ScaleController : public DeviceControllerSerial {
     // constructors
     ScaleController();
     ScaleController (int reset_pin, const long baud_rate, const long serial_config, const int request_wait, const int error_wait, ScaleState *state, ScaleData *data) :
-      DeviceControllerSerial(reset_pin, baud_rate, serial_config, request_wait, error_wait), state(state), data(data) {
-        const int pattern[] = {P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, B_SPACE, B_SPACE, P_UNIT, P_STABLE, B_CR};
+      DeviceControllerSerial(reset_pin, baud_rate, serial_config, "#", request_wait, error_wait), state(state), data(data) {
+        const int pattern[] = {P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, B_SPACE, B_SPACE, P_UNIT, P_STABLE, B_CR, B_NL};
         data_pattern_size = sizeof(pattern) / sizeof(pattern[0]) - 1;
-        for (int i=0; i < data_pattern_size; i++) data_pattern[i] = pattern[i];
+        for (int i=0; i <= data_pattern_size; i++) data_pattern[i] = pattern[i];
       }
 
     // setup and loop methods
+    bool serialIsManual();
     void startSerialData();
     int processSerialData(byte b);
     void completeSerialData();
@@ -80,6 +82,10 @@ class ScaleController : public DeviceControllerSerial {
 
 /**** SERIAL COMMUNICATION ****/
 
+bool ScaleController::serialIsManual(){
+  return(state->data_logging_period == 0);
+}
+
 void ScaleController::startSerialData() {
   data->resetBuffers();
   data->storeReceivedDataTime(millis());
@@ -89,17 +95,24 @@ void ScaleController::startSerialData() {
 int ScaleController::processSerialData(byte b) {
 
   char c = (char) b;
+
   if ( data_pattern[data_pattern_pos] == P_VAL && ( (b >= B_0 && b <= B_9) || c == ' ' || c == '+' || c == '-' || c == '.') ) {
     // value (ignoring spaces)
     if (b != B_SPACE) data->appendToValueBuffer(b);
   } else if (data_pattern[data_pattern_pos] == P_UNIT && (c == 'G' || c == 'O' || c == 'C')) {
     // units
+    if (c == 'G') data->setUnitsBuffer("g"); // grams
+    else if (c == 'O') data->setUnitsBuffer("oz"); // ounces
+    else if (c == 'C') data->setUnitsBuffer("ct"); // what is ct??
+    if (!data->compareUnits()) {
+      // new units!
+      data->newValue();
+      data->setUnits(data->units_buffer);
+    }
   } else if (data_pattern[data_pattern_pos] == P_STABLE && (c == 'S' || c == ' ')) {
-    // reading stable?
-  } else if (data_pattern[data_pattern_pos] == B_SPACE && b == B_SPACE) {
-    // space
-  } else if (data_pattern[data_pattern_pos] == B_CR && b == B_CR) {
-    // carriage return
+    // whether the reading is stable - note: not currently interpreted
+  } else if (data_pattern[data_pattern_pos] > P_BYTE && b == data_pattern[data_pattern_pos]) {
+    // specific ascii characters
   } else {
     // unrecognized part of data --> error
     return(SERIAL_DATA_ERROR);
@@ -109,7 +122,7 @@ int ScaleController::processSerialData(byte b) {
   data_pattern_pos++;
 
   // message complete
-  if (data_pattern_pos == data_pattern_size) {
+  if (data_pattern_pos > data_pattern_size) {
     return(SERIAL_DATA_COMPLETE);
   }
 
