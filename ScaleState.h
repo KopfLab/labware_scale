@@ -20,7 +20,18 @@ static void getStateDataLoggingPeriodText(int logging_period, char* target, int 
     getStateStringText(CMD_DATA_LOG_PERIOD, CMD_DATA_LOG_PERIOD_MANUAL, target, size, pattern, include_key);
   } else {
     // specific logging period
-    getStateIntText(CMD_DATA_LOG_PERIOD, logging_period, "s", target, size, pattern, include_key);
+    char units[] = "s";
+    if (logging_period % 3600 == 0) {
+      // hours
+      strcpy(units, "h");
+      logging_period = logging_period/3600;
+    } else if (logging_period % 60 == 0) {
+      // minutes
+      strcpy(units, "m");
+      logging_period = logging_period/60;
+
+    }
+    getStateIntText(CMD_DATA_LOG_PERIOD, logging_period, units, target, size, pattern, include_key);
   }
 }
 
