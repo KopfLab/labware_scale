@@ -23,23 +23,7 @@ class ScaleController : public DeviceControllerSerial {
     ScaleState* state;
     DeviceState* ds = state;
 
-    /**** serial communication *****/
-    // pattern pieces
-    const int P_VAL = -1; // [ +-0-9]
-    const int P_UNIT = -2; // [GOC]
-    const int P_STABLE = -3; // [ S]
-    const int P_BYTE = 0; // anything > 0 is specific byte
-
-    // specific ascii characters (actual byte values)
-    const int B_SPACE = 32; // \\s
-    const int B_CR = 13; // \r
-    const int B_NL = 10; // \n
-    const int B_0 = 48; // 0
-    const int B_9 = 57; // 9
-
-    // overall data pattern
-    int data_pattern[20];
-    int data_pattern_size;
+    // serial communication
     int data_pattern_pos;
 
   public:
@@ -48,14 +32,9 @@ class ScaleController : public DeviceControllerSerial {
     ScaleController();
     ScaleController (int reset_pin, const long baud_rate, const long serial_config, const int request_wait, const int error_wait, ScaleState* state) :
       DeviceControllerSerial(reset_pin, baud_rate, serial_config, "#", request_wait, error_wait), state(state) {
-        // allocate data size
+        // start data vector
         data.resize(2);
         data[0].setVariable("weight");
-
-        // data pattern
-        const int pattern[] = {P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, B_SPACE, B_SPACE, P_UNIT, P_STABLE, B_CR, B_NL};
-        data_pattern_size = sizeof(pattern) / sizeof(pattern[0]) - 1;
-        for (int i=0; i <= data_pattern_size; i++) data_pattern[i] = pattern[i];
       }
 
     // setup and loop methods
@@ -93,6 +72,22 @@ void ScaleController::startSerialData() {
   data[0].setNewestDataTime(millis());
   data_pattern_pos = 0;
 }
+
+// pattern pieces
+#define P_VAL       -1 // [ +-0-9]
+#define P_UNIT      -2 // [GOC]
+#define P_STABLE    -3 // [ S]
+#define P_BYTE       0 // anything > 0 is specific byte
+
+// specific ascii characters (actual byte values)
+#define B_SPACE      32 // \\s
+#define B_CR         13 // \r
+#define B_NL         10 // \n
+#define B_0          48 // 0
+#define B_9          57 // 9
+
+const int data_pattern[] = {P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, B_SPACE, B_SPACE, P_UNIT, P_STABLE, B_CR, B_NL};
+const int data_pattern_size = sizeof(data_pattern) / sizeof(data_pattern[0]) - 1;
 
 int ScaleController::processSerialData(byte b) {
   // keep track of all data
