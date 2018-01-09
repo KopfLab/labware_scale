@@ -30,11 +30,11 @@ class ScaleController : public DeviceControllerSerial {
 
     // constructors
     ScaleController();
-    ScaleController (int reset_pin, const long baud_rate, const long serial_config, const int request_wait, const int error_wait, ScaleState* state) :
+    ScaleController (int reset_pin, const long baud_rate, const long serial_config, const int request_wait, const int error_wait, const int digits, ScaleState* state) :
       DeviceControllerSerial(reset_pin, baud_rate, serial_config, "#", request_wait, error_wait), state(state) {
         // start data vector
         data.resize(2);
-        data[0].setVariable("weight");
+        data[0] = DeviceData("weight", digits);
       }
 
     // setup and loop methods
@@ -129,7 +129,6 @@ int ScaleController::processSerialData(byte b) {
 void ScaleController::completeSerialData() {
   data[0].setNewestValue(value_buffer);
   data[0].saveNewestValue(true); // average
-  data[0].assembleLog();
   DeviceControllerSerial::completeSerialData();
 }
 
@@ -291,7 +290,6 @@ void ScaleController::assembleStateInformation() {
   DeviceController::assembleStateInformation();
   char pair[60];
   getStateDataLoggingPeriodText(state->data_logging_period, pair, sizeof(pair)); addToStateInformation(pair);
-  // FIXME: continue here
 }
 
 /****** WEB COMMAND PROCESSING *******/

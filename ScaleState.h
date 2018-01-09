@@ -38,7 +38,9 @@ static void getStateDataLoggingPeriodText(int logging_period, char* target, int 
 // read period (standard patterns)
 static void getStateDataLoggingPeriodText(int logging_period, char* target, int size, bool value_only = false) {
   if (value_only) {
-    getStateDataLoggingPeriodText(logging_period, target, size, PATTERN_VU_SIMPLE, false);
+    (logging_period == 0) ?
+      getStateDataLoggingPeriodText(logging_period, target, size, PATTERN_V_SIMPLE, false) : // manual
+      getStateDataLoggingPeriodText(logging_period, target, size, PATTERN_VU_SIMPLE, false); // number
   } else {
     (logging_period == 0) ?
       getStateDataLoggingPeriodText(logging_period, target, size, PATTERN_KV_JSON_QUOTED, true) : // manual
