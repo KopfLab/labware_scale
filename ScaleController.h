@@ -106,7 +106,7 @@ int ScaleController::processSerialData(byte b) {
     else if (c == 'C') data->setUnitsBuffer("ct"); // what is ct??
     if (!data->compareUnits()) {
       // new units!
-      data->newValue();
+      data->resetValue();
       data->setUnits(data->units_buffer);
     }
   } else if (data_pattern[data_pattern_pos] == P_STABLE && (c == 'S' || c == ' ')) {
@@ -131,7 +131,7 @@ int ScaleController::processSerialData(byte b) {
 
 void ScaleController::completeSerialData() {
   data->storeValue();
-  data->setValue(true); // average
+  data->saveNewestValue(true); // average
   data->resetBuffers();
   data->assembleLog();
 }
