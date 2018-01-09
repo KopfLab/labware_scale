@@ -41,7 +41,7 @@ ScaleController* scale = new ScaleController(
   /* pointer to state */  state
 );
 
-// user interface update
+// user interface 
 char lcd_buffer[21];
 
 void update_gui_state() {
@@ -96,9 +96,6 @@ void report_command () {
 
 // callback function for data
 void report_data() {
-  Serial.println("CALLBACK data: " +
-    String(scale->data[0].value) + "(" +
-    String(scale->data[0].n) + ")");
   update_gui_data();
 }
 
@@ -146,7 +143,7 @@ void setup() {
   // initial user interface update
   update_gui_state();
   update_gui_data();
-  
+
   // connect device to cloud and register for listeners
   Serial.println("INFO: connecting to cloud");
   Particle.connect();
