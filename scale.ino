@@ -61,9 +61,9 @@ void update_user_interface () {
 // callback function for commands
 void report_command () {
   Serial.println("INFO: command callback: " +
-    String(scale->getCommand()->type) + " " +
-    String(scale->getCommand()->variable) + " " +
-    String(scale->getCommand()->value));
+    String(scale->command.type) + " " +
+    String(scale->command.variable) + " " +
+    String(scale->command.value));
   update_user_interface();
 }
 
