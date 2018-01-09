@@ -31,9 +31,6 @@ ScaleState* state = new ScaleState(
   /* data_logging_period */   70 // in seconds
 );
 
-// data store in scale
-ScaleData* data = new ScaleData();
-
 // scale controller
 ScaleController* scale = new ScaleController(
   /* reset pin */         A5,
@@ -41,8 +38,7 @@ ScaleController* scale = new ScaleController(
   /* serial config */     SERIAL_8N1,
   /* request wait */      5000,
   /* error wait */        500,
-  /* pointer to state */  state,
-  /* pointer to data */   data
+  /* pointer to state */  state
 );
 
 // user interface update
@@ -65,6 +61,13 @@ void report_command () {
     String(scale->command.variable) + " " +
     String(scale->command.value));
   update_user_interface();
+}
+
+// callback function for data
+void report_data() {
+  Serial.println("CALLBACK data: " +
+    String(scale->data[0].value) + "(" +
+    String(scale->data[0].n) + ")");
 }
 
 // callback function for device name
@@ -93,6 +96,7 @@ void setup() {
   Serial.println("INFO: initialize scale");
   scale->setCommandCallback(report_command);
   scale->setNameCallback(report_name);
+  scale->setDataCallback(report_data);
   scale->init();
 
   // check for reset

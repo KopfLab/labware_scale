@@ -5,9 +5,9 @@
  */
 
 #pragma once
+#include <vector>
 #include "ScaleState.h"
 #include "ScaleCommands.h"
-#include "ScaleData.h"
 #include "device/DeviceControllerSerial.h"
 
 // serial communication constants
@@ -20,11 +20,8 @@ class ScaleController : public DeviceControllerSerial {
   private:
 
     // state
-    ScaleState *state;
-    DeviceState *ds = state;
-
-    // data
-    ScaleData *data;
+    ScaleState* state;
+    DeviceState* ds = state;
 
     /**** serial communication *****/
     // pattern pieces
@@ -49,8 +46,13 @@ class ScaleController : public DeviceControllerSerial {
 
     // constructors
     ScaleController();
-    ScaleController (int reset_pin, const long baud_rate, const long serial_config, const int request_wait, const int error_wait, ScaleState *state, ScaleData *data) :
-      DeviceControllerSerial(reset_pin, baud_rate, serial_config, "#", request_wait, error_wait), state(state), data(data) {
+    ScaleController (int reset_pin, const long baud_rate, const long serial_config, const int request_wait, const int error_wait, ScaleState* state) :
+      DeviceControllerSerial(reset_pin, baud_rate, serial_config, "#", request_wait, error_wait), state(state) {
+        // allocate data size
+        data.resize(2);
+        data[0].setVariable("weight");
+
+        // data pattern
         const int pattern[] = {P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, B_SPACE, B_SPACE, P_UNIT, P_STABLE, B_CR, B_NL};
         data_pattern_size = sizeof(pattern) / sizeof(pattern[0]) - 1;
         for (int i=0; i <= data_pattern_size; i++) data_pattern[i] = pattern[i];
@@ -87,27 +89,28 @@ bool ScaleController::serialIsManual(){
 }
 
 void ScaleController::startSerialData() {
-  data->resetBuffers();
-  data->storeReceivedDataTime(millis());
+  DeviceControllerSerial::startSerialData();
+  data[0].setNewestDataTime(millis());
   data_pattern_pos = 0;
 }
 
 int ScaleController::processSerialData(byte b) {
+  // keep track of all data
+  DeviceControllerSerial::processSerialData(b);
 
+  // pattern interpretation
   char c = (char) b;
-
   if ( data_pattern[data_pattern_pos] == P_VAL && ( (b >= B_0 && b <= B_9) || c == ' ' || c == '+' || c == '-' || c == '.') ) {
-    // value (ignoring spaces)
-    if (b != B_SPACE) data->appendToValueBuffer(b);
+    if (b != B_SPACE) appendToSerialValueBuffer(b); // value (ignoring spaces)
   } else if (data_pattern[data_pattern_pos] == P_UNIT && (c == 'G' || c == 'O' || c == 'C')) {
     // units
-    if (c == 'G') data->setUnitsBuffer("g"); // grams
-    else if (c == 'O') data->setUnitsBuffer("oz"); // ounces
-    else if (c == 'C') data->setUnitsBuffer("ct"); // what is ct??
-    if (!data->compareUnits()) {
-      // new units!
-      data->resetValue();
-      data->setUnits(data->units_buffer);
+    if (c == 'G') setSerialUnitsBuffer("g"); // grams
+    else if (c == 'O') setSerialUnitsBuffer("oz"); // ounces
+    else if (c == 'C') setSerialUnitsBuffer("ct"); // what is ct??
+    if (!data[0].isUnitsIdentical(units_buffer)) {
+      // units are switching
+      data[0].resetValue();
+      data[0].setUnits(units_buffer);
     }
   } else if (data_pattern[data_pattern_pos] == P_STABLE && (c == 'S' || c == ' ')) {
     // whether the reading is stable - note: not currently interpreted
@@ -125,15 +128,14 @@ int ScaleController::processSerialData(byte b) {
   if (data_pattern_pos > data_pattern_size) {
     return(SERIAL_DATA_COMPLETE);
   }
-
   return(SERIAL_DATA_WAITING);
 }
 
 void ScaleController::completeSerialData() {
-  data->storeValue();
-  data->saveNewestValue(true); // average
-  data->resetBuffers();
-  data->assembleLog();
+  data[0].setNewestValue(value_buffer);
+  data[0].saveNewestValue(true); // average
+  data[0].assembleLog();
+  DeviceControllerSerial::completeSerialData();
 }
 
 /*
@@ -172,17 +174,17 @@ void ScaleController::update() {
   // message completely received
   if (waiting_for_response && data_received) {
     Serial.println("INFO: data reading complete");
-    data->storeValue();
-    data->setValue(true); // average
-    data->resetBuffers();
-    data->assembleLog();
+    data[0].storeValue();
+    data[0].setValue(true); // average
+    data[0].resetBuffers();
+    data[0].assembleLog();
     waiting_for_response = false;
   }
 
   // error
   if (waiting_for_response && data_error) {
     Serial.println("INFO: encountered data error -- resetting");
-    data->resetBuffers();
+    data[0].resetBuffers();
     last_error = millis();
     temp_message = "";
     waiting_for_response = false;
