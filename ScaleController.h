@@ -25,7 +25,7 @@ class ScaleController : public DeviceControllerSerial {
 
     // serial communication
     int data_pattern_pos;
-    long last_data_log;
+    unsigned long last_data_log;
 
   public:
 
@@ -74,8 +74,8 @@ void ScaleController::init() {
 /**** DATA LOGGING ****/
 
 bool ScaleController::isTimeForDataReset() {
-  long log_period = state->data_logging_period * 1000;
-  if (serialIsActive() && !serialIsManual() && (millis() - last_data_log > log_period || millis() < last_data_log )) {
+  unsigned long log_period = state->data_logging_period * 1000;
+  if (serialIsActive() && !serialIsManual() && (millis() - last_data_log) > log_period) {
     last_data_log = millis();
     return(true);
   }

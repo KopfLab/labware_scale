@@ -36,7 +36,7 @@ public:
 
 	uint8_t info_width;			// width of info messages
 	int info_msg_show_time;		// how long current info message is being shown for (in ms), 0 = no message shown
-	long info_msg_show_start;	// when the last info message was started
+	unsigned long info_msg_show_start;	// when the last info message was started
 
 	Display (uint8_t lcd_Addr, uint8_t lcd_cols, uint8_t lcd_rows) :
 		   // addr, en,rw,rs,d4,d5,d6,d7,bl,blpol

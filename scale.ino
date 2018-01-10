@@ -37,7 +37,7 @@ ScaleController* scale = new ScaleController(
   /* serial config */     SERIAL_8N1,
   /* request wait */      5000, // FIXME: maybe move to state
   /* error wait */        500,
-  /* digits */              1, // FIXME: maybe move to state
+  /* report digits */     3, // FIXME: maybe move to state
   /* pointer to state */  state
 );
 
@@ -77,7 +77,7 @@ void update_gui_data() {
 
     // latest data
     if (scale->data[0].newest_value_valid)
-      getDataDoubleText("Last", scale->data[0].newest_value, scale->data[0].units, lcd_buffer, sizeof(lcd_buffer), PATTERN_KVU_SIMPLE, scale->data[0].digits);
+      getDataDoubleText("Last", scale->data[0].newest_value, scale->data[0].units, lcd_buffer, sizeof(lcd_buffer), PATTERN_KVU_SIMPLE, 1);
     else
       strcpy(lcd_buffer, "Last: no data yet");
     lcd.print_line(3, String(lcd_buffer));
