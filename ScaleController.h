@@ -25,6 +25,7 @@ class ScaleController : public DeviceControllerSerial {
 
     // serial communication
     int data_pattern_pos;
+    long last_data_log;
 
   public:
 
@@ -33,11 +34,17 @@ class ScaleController : public DeviceControllerSerial {
     ScaleController (int reset_pin, const long baud_rate, const long serial_config, const int request_wait, const int error_wait, const int digits, ScaleState* state) :
       DeviceControllerSerial(reset_pin, baud_rate, serial_config, "#", request_wait, error_wait), state(state) {
         // start data vector
-        data.resize(2);
+        data.resize(1);
         data[0] = DeviceData("weight", digits);
       }
 
-    // setup and loop methods
+    // setup and loop
+    void init();
+
+    // check whether time for data reset and log
+    bool isTimeForDataReset();
+
+    // serial
     bool serialIsManual();
     void startSerialData();
     int processSerialData(byte b);
@@ -59,19 +66,23 @@ class ScaleController : public DeviceControllerSerial {
 
 /**** SETUP & LOOP ****/
 
+void ScaleController::init() {
+  DeviceControllerSerial::init();
+  last_data_log = millis();
+}
 
+/**** DATA LOGGING ****/
+
+bool ScaleController::isTimeForDataReset() {
+  long log_period = state->data_logging_period * 1000;
+  if (serialIsActive() && !serialIsManual() && (millis() - last_data_log > log_period || millis() < last_data_log )) {
+    last_data_log = millis();
+    return(true);
+  }
+  return(false);
+}
 
 /**** SERIAL COMMUNICATION ****/
-
-bool ScaleController::serialIsManual(){
-  return(state->data_logging_period == 0);
-}
-
-void ScaleController::startSerialData() {
-  DeviceControllerSerial::startSerialData();
-  data[0].setNewestDataTime(millis());
-  data_pattern_pos = 0;
-}
 
 // pattern pieces
 #define P_VAL       -1 // [ +-0-9]
@@ -88,6 +99,15 @@ void ScaleController::startSerialData() {
 
 const int data_pattern[] = {P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, B_SPACE, B_SPACE, P_UNIT, P_STABLE, B_CR, B_NL};
 const int data_pattern_size = sizeof(data_pattern) / sizeof(data_pattern[0]) - 1;
+
+bool ScaleController::serialIsManual(){
+  return(state->data_logging_period == 0);
+}
+
+void ScaleController::startSerialData() {
+  DeviceControllerSerial::startSerialData();
+  data_pattern_pos = 0;
+}
 
 int ScaleController::processSerialData(byte b) {
   // keep track of all data
@@ -131,98 +151,6 @@ void ScaleController::completeSerialData() {
   data[0].saveNewestValue(true); // average
   DeviceControllerSerial::completeSerialData();
 }
-
-/*
-// loop function
-void ScaleController::update() {
-  DeviceController::update();
-
-  // FIXME: some of the stuff after this could be abstracted into a new DeviceControllerSerial class
-
-  // check serial communication
-  while (Serial1.available()) {
-    byte b = Serial1.read();
-
-
-    // if error --> allow time to empty the serial buffer
-    if (data_error) last_error = millis();
-
-    // if not waiting for response
-    if (data_error || !waiting_for_response) continue;
-
-    // proces byte
-    if (!processSerialData(b)) {
-      data_error = true;
-      Serial.print("WARNING - unexpected character at pattern_pos " + String(pattern_pos) + ": ");
-      Serial.print(b);
-      Serial.print(" = ");
-      Serial.println((char) b);
-    }
-
-    // message complete
-    if (pattern_pos == pattern_size) {
-      data_received = true;
-    }
-  }
-
-  // message completely received
-  if (waiting_for_response && data_received) {
-    Serial.println("INFO: data reading complete");
-    data[0].storeValue();
-    data[0].setValue(true); // average
-    data[0].resetBuffers();
-    data[0].assembleLog();
-    waiting_for_response = false;
-  }
-
-  // error
-  if (waiting_for_response && data_error) {
-    Serial.println("INFO: encountered data error -- resetting");
-    data[0].resetBuffers();
-    last_error = millis();
-    temp_message = "";
-    waiting_for_response = false;
-  }
-
-  // data request: if not currently waiting for a response and
-  //   - either there was an error and and it's past the error reset time
-  //   - or if it's data logging time
-  //   - or if it's on manual request mode
-  bool request_data =
-    !waiting_for_response &&
-    (
-      (data_error && millis() - last_error > ERROR_RESET_TIME) ||
-      (state->data_logging_period > 0 && millis() > last_read + read_period) ||
-      (state->data_logging_period == 0)
-    );
-
-
-  // (re)-request information from scale
-  if (request_data){
-
-    // datetime
-    char date_time_buffer[21];
-    Time.format(Time.now(), "%Y-%m-%d %H:%M:%S").toCharArray(date_time_buffer, sizeof(date_time_buffer));
-    Serial.print("INFO: ");
-    Serial.print(date_time_buffer);
-    if (state->data_logging_period == 0) {
-      // manual logging?
-      Serial.println(" - listening to manual data transmission from scale...");
-    } else {
-      // data request
-      Serial.println(" - issuing request for data to scale.");
-      Serial1.println(SCALE_DATA_REQUEST);
-    }
-
-    // request parameters
-    last_read = millis();
-    waiting_for_response = true;
-    data_received = false;
-    data_error = false;
-    pattern_pos = 0;
-  }
-}
-*/
 
 /**** STATE PERSISTENCE ****/
 

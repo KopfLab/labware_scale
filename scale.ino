@@ -35,13 +35,13 @@ ScaleController* scale = new ScaleController(
   /* reset pin */         A5,
   /* baud rate */         4800,
   /* serial config */     SERIAL_8N1,
-  /* request wait */      5000, // FIXME: maybe move to setting
+  /* request wait */      5000, // FIXME: maybe move to state
   /* error wait */        500,
-  /* digits */              1, // FIXME: maybe move to digits
+  /* digits */              1, // FIXME: maybe move to state
   /* pointer to state */  state
 );
 
-// user interface 
+// user interface
 char lcd_buffer[21];
 
 void update_gui_state() {
@@ -60,7 +60,7 @@ void update_gui_data() {
   // lcd
   #ifdef ENABLE_DISPLAY
     // running data
-    if (state->data_logging_period == 0) {
+    if (scale->serialIsManual()) {
       // manual mode (show latest)
       if (scale->data[0].n > 0)
         Time.format(Time.now() - scale->data[0].data_time, "%Y-%m-%d %H:%M:%S").toCharArray(lcd_buffer, sizeof(lcd_buffer));
@@ -115,7 +115,6 @@ void setup() {
 
   // serial
   Serial.begin(9600);
-
   delay(3000);
 
   // time sync
@@ -132,6 +131,10 @@ void setup() {
   scale->setDataCallback(report_data);
   scale->init();
 
+  // connect device to cloud
+  Serial.println("INFO: connecting to cloud");
+  Particle.connect();
+
   // check for reset
   if (scale->wasReset()) {
     #ifdef ENABLE_DISPLAY
@@ -143,10 +146,6 @@ void setup() {
   // initial user interface update
   update_gui_state();
   update_gui_data();
-
-  // connect device to cloud and register for listeners
-  Serial.println("INFO: connecting to cloud");
-  Particle.connect();
 
 }
 
