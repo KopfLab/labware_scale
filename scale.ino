@@ -27,7 +27,7 @@ ScaleState* state = new ScaleState(
   /* locked */                false,
   /* state_logging */         true,
   /* data_logging */          false,
-  /* data_logging_period */   70 // in seconds
+  /* data_logging_period */   300 // in seconds
 );
 
 // scale controller
