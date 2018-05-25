@@ -7,8 +7,8 @@ struct ScaleState : public DeviceState {
   int data_logging_period; // period between logs
 
   ScaleState() {};
-  ScaleState(int timezone, bool locked, bool state_logging, bool data_logging, int data_logging_period) :
-    DeviceState(timezone, locked, state_logging, data_logging), data_logging_period(data_logging_period) {};
+  ScaleState(bool locked, bool state_logging, bool data_logging, int data_logging_period) :
+    DeviceState(locked, state_logging, data_logging), data_logging_period(data_logging_period) {};
 };
 
 /**** textual translations of state values ****/

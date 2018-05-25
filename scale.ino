@@ -23,7 +23,6 @@ Display lcd (
 
 // initial state of the scale
 ScaleState* state = new ScaleState(
-  /* timezone */              -6, // Mountain Daylight Time -6 / Mountain Standard Time -7
   /* locked */                false,
   /* state_logging */         true,
   /* data_logging */          false,
@@ -63,7 +62,7 @@ void update_gui_data() {
     if (scale->serialIsManual()) {
       // manual mode (show latest)
       if (scale->data[0].n > 0)
-        Time.format(Time.now() - scale->data[0].data_time, "%Y-%m-%d %H:%M:%S").toCharArray(lcd_buffer, sizeof(lcd_buffer));
+        Time.format(Time.now() - scale->data[0].data_time, "%Y-%m-%d %H:%M:%S %Z").toCharArray(lcd_buffer, sizeof(lcd_buffer));
       else
         strcpy(lcd_buffer, "Time: no data yet");
     } else {

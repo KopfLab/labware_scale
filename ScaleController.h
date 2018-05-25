@@ -231,8 +231,6 @@ void ScaleController::parseCommand() {
     // state logging getting parsed
   } else if (parseDataLogging()) {
     // state logging getting parsed
-  } else if (parseTimezone()) {
-    // time zone getting parsed
   } else if (parseDataLoggingPeriod()) {
     // parsing read period
   } else {
