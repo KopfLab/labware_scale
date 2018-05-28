@@ -45,7 +45,7 @@ void update_gui_state() {
       getStateDataLoggingPeriodText(state->data_logging_period, lcd_buffer, sizeof(lcd_buffer), true);
     else
       strcpy(lcd_buffer, "off");
-    lcd->print_line(4, "Log: " + String(lcd_buffer));
+    lcd->printLine(4, "Log: " + String(lcd_buffer));
   }
 }
 
@@ -66,23 +66,21 @@ void update_gui_data() {
       else
         strcpy(lcd_buffer, "Avg: no data yet");
     }
-    lcd->print_line(2, String(lcd_buffer));
+    lcd->printLine(2, String(lcd_buffer));
 
     // latest data
     if (scale->data[0].newest_value_valid)
       getDataDoubleText("Last", scale->data[0].newest_value, scale->data[0].units, lcd_buffer, sizeof(lcd_buffer), PATTERN_KVU_SIMPLE, 1);
     else
       strcpy(lcd_buffer, "Last: no data yet");
-    lcd->print_line(3, String(lcd_buffer));
+    lcd->printLine(3, String(lcd_buffer));
   }
 }
 
 // callback function for commands
 void report_command () {
-  Serial.println("INFO: command callback: " +
-    String(scale->command.type) + " " +
-    String(scale->command.variable) + " " +
-    String(scale->command.value));
+  Serial.printf("INFO: command callback: command = '%s'\n -> type = '%s' (%s), variable = '%s', value = '%s', msg = '%s', notes = '%s'\n",
+    scale->command.command, scale->command.type, scale->command.type_short, scale->command.variable, scale->command.value, scale->command.msg, scale->command.notes);
   update_gui_state();
   update_gui_data();
 }
@@ -105,6 +103,9 @@ void setup() {
 
   // time sync
   ts->init();
+
+  // lcd temporary messages
+  lcd->setTempTextShowTime(5); // 3 sconds temp text
 
   // scale
   Serial.println("INFO: initialize scale");
