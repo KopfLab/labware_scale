@@ -26,17 +26,20 @@ class ScaleController : public DeviceControllerSerial {
     // serial communication
     int data_pattern_pos;
     unsigned long last_data_log;
+    void construct(const int digits);
 
   public:
 
     // constructors
     ScaleController();
+
+    // without LCD
     ScaleController (int reset_pin, const long baud_rate, const long serial_config, const int request_wait, const int error_wait, const int digits, ScaleState* state) :
-      DeviceControllerSerial(reset_pin, baud_rate, serial_config, "#", request_wait, error_wait), state(state) {
-        // start data vector
-        data.resize(1);
-        data[0] = DeviceData("weight", digits);
-      }
+      DeviceControllerSerial(reset_pin, baud_rate, serial_config, "#", request_wait, error_wait), state(state) { construct(digits); }
+
+    // with LCD
+    ScaleController (int reset_pin, DeviceDisplay* lcd, const long baud_rate, const long serial_config, const int request_wait, const int error_wait, const int digits, ScaleState* state) :
+      DeviceControllerSerial(reset_pin, lcd, baud_rate, serial_config, "#", request_wait, error_wait), state(state) { construct(digits); }
 
     // setup and loop
     void init();
@@ -63,6 +66,14 @@ class ScaleController : public DeviceControllerSerial {
     // particle command
     void parseCommand (); // parse a cloud command
 };
+
+/**** CONSTRUCTION ****/
+
+void ScaleController::construct(const int digits) {
+  // start data vector
+  data.resize(1);
+  data[0] = DeviceData("weight", digits);
+}
 
 /**** SETUP & LOOP ****/
 
