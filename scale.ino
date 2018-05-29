@@ -8,6 +8,10 @@
 #include "TimeSync.h";
 TimeSync* ts = new TimeSync();
 
+// debugging options
+#define CLOUD_DEBUG_NOSEND
+//#define LCD_DEBUG_ON
+
 // scale controller
 #include "ScaleController.h"
 
