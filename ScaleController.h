@@ -46,13 +46,16 @@ class ScaleController : public DeviceControllerSerial {
     void completeSerialData();
 
     // state
+    void assembleStateInformation();
     DeviceState* getDS() { return(ds); }; // return device state
     DeviceStateSerial* getDSS() { return(dss); }; // return device state serial
     void saveDS(); // save device state to EEPROM
     bool restoreDS(); // load device state from EEPROM
 
-    // particle command
+    // particle commands
     void parseCommand (); // parse a cloud command
+    bool changeCalcRate(uint rate);
+    bool parseCalcRate();
 
 };
 
@@ -131,6 +134,15 @@ void ScaleController::completeSerialData() {
   DeviceControllerSerial::completeSerialData();
 }
 
+/****** STATE INFORMATION *******/
+
+void ScaleController::assembleStateInformation() {
+  DeviceControllerSerial::assembleStateInformation();
+  char pair[60];
+  getStateCalcRateText(state->calc_rate, pair, sizeof(pair)); addToStateInformation(pair);
+}
+
+
 /**** STATE PERSISTENCE ****/
 
 // save device state to EEPROM
@@ -165,8 +177,56 @@ void ScaleController::parseCommand() {
 
   if (command.isTypeDefined()) {
     // command processed successfully by parent function
+  } else if (parseCalcRate()) {
+    // calc rate command parsed
   }
 
-  // additional, device specific commands
+  // more additional, device specific commands
 
+}
+
+bool ScaleController::changeCalcRate(uint rate) {
+
+  bool changed = rate != state->calc_rate;
+
+  if (changed) {
+    state->calc_rate = rate;
+  }
+
+  #ifdef STATE_DEBUG_ON
+    if (changed) Serial.printf("INFO: setting rate to %d\n", rate);
+    else Serial.printf("INFO: rate unchanged (%d)\n", rate);
+  #endif
+
+  if (changed) saveDS();
+
+  return(changed);
+}
+
+bool ScaleController::parseCalcRate() {
+  if (command.parseVariable(CMD_CALC_RATE)) {
+    // parse calc rate
+    command.extractValue();
+    if (command.parseValue(CMD_CALC_RATE_OFF)){
+      // no rate calculation
+      command.success(changeCalcRate(CALC_RATE_OFF));
+    } else if (command.parseValue(CMD_CALC_RATE_SEC)) {
+      // [mass]/second
+      command.success(changeCalcRate(CALC_RATE_SEC));
+    } else if (command.parseValue(CMD_CALC_RATE_MIN)) {
+      // [mass]/minute
+      command.success(changeCalcRate(CALC_RATE_MIN));
+    } else if (command.parseValue(CMD_CALC_RATE_HR)) {
+      // [mass]/hour
+      command.success(changeCalcRate(CALC_RATE_HR));
+    } else if (command.parseValue(CMD_CALC_RATE_DAY)) {
+      // [mass]/day
+      command.success(changeCalcRate(CALC_RATE_DAY));
+    } else {
+      // invalid value
+      command.errorValue();
+    }
+    getStateCalcRateText(state->calc_rate, command.data, sizeof(command.data));
+  }
+  return(command.isTypeDefined());
 }

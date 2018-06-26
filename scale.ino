@@ -30,7 +30,8 @@ ScaleState* state = new ScaleState(
   /* data_reading_period_min */   1000, // in ms
   /* data_reading_period */       5000, // in ms
   /* data_logging_period */       300, // in seconds
-  /* data_logging_type */         LOG_BY_TIME // log by time
+  /* data_logging_type */         LOG_BY_TIME, // log by time
+  /* calc_rate */                 CALC_RATE_MIN
 );
 
 // scale controller
