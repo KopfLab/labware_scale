@@ -48,6 +48,6 @@ static void getStateCalcRateText(uint calc_rate, char* target, int size, char* p
 // read period (standard patterns)
 static void getStateCalcRateText(uint calc_rate, char* target, int size, bool value_only = false) {
   (value_only) ?
-      getStateDataReadingPeriodText(calc_rate, target, size, PATTERN_V_SIMPLE, false) :
-      getStateDataReadingPeriodText(calc_rate, target, size, PATTERN_KV_JSON_QUOTED, true);
+      getStateCalcRateText(calc_rate, target, size, PATTERN_V_SIMPLE, false) :
+      getStateCalcRateText(calc_rate, target, size, PATTERN_KV_JSON_QUOTED, true);
 }

@@ -191,6 +191,7 @@ bool ScaleController::changeCalcRate(uint rate) {
 
   if (changed) {
     state->calc_rate = rate;
+    resetData(); // make sure no data is averaged with different calc-rate settings
   }
 
   #ifdef STATE_DEBUG_ON
