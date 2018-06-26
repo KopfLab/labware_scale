@@ -9,7 +9,11 @@
 TimeSync* ts = new TimeSync();
 
 // debugging options
+#define CLOUD_DEBUG_ON
 #define CLOUD_DEBUG_NOSEND
+#define STATE_DEBUG_ON
+#define DATA_DEBUG_ON
+#define SERIAL_DEBUG_ON
 //#define LCD_DEBUG_ON
 
 // scale controller
@@ -20,10 +24,13 @@ DeviceDisplay* lcd = &LCD_20x4;
 
 // initial state of the scale
 ScaleState* state = new ScaleState(
-  /* locked */                false,
-  /* state_logging */         true,
-  /* data_logging */          false,
-  /* data_logging_period */   300 // in seconds
+  /* locked */                    false,
+  /* state_logging */             true,
+  /* data_logging */              false,
+  /* data_reading_period_min */   1000, // in ms
+  /* data_reading_period */       5000, // in ms
+  /* data_logging_period */       300, // in seconds
+  /* data_logging_type */         LOG_BY_TIME // log by time
 );
 
 // scale controller
@@ -46,7 +53,7 @@ void update_gui_state() {
   if (lcd) {
     // state updates
     if (state->data_logging)
-      getStateDataLoggingPeriodText(state->data_logging_period, lcd_buffer, sizeof(lcd_buffer), true);
+      getStateDataLoggingPeriodText(state->data_logging_period, state->data_logging_type, lcd_buffer, sizeof(lcd_buffer), true);
     else
       strcpy(lcd_buffer, "off");
     lcd->printLine(4, "Log: " + String(lcd_buffer));

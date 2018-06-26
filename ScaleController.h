@@ -7,7 +7,6 @@
 #pragma once
 #include <vector>
 #include "ScaleState.h"
-#include "ScaleCommands.h"
 #include "device/DeviceControllerSerial.h"
 
 // serial communication constants
@@ -21,11 +20,11 @@ class ScaleController : public DeviceControllerSerial {
 
     // state
     ScaleState* state;
+    DeviceStateSerial* dss = state;
     DeviceState* ds = state;
 
     // serial communication
     int data_pattern_pos;
-    unsigned long last_data_log;
     void construct(const int digits);
 
   public:
@@ -41,30 +40,20 @@ class ScaleController : public DeviceControllerSerial {
     ScaleController (int reset_pin, DeviceDisplay* lcd, const long baud_rate, const long serial_config, const int request_wait, const int error_wait, const int digits, ScaleState* state) :
       DeviceControllerSerial(reset_pin, lcd, baud_rate, serial_config, "#", request_wait, error_wait), state(state) { construct(digits); }
 
-    // setup and loop
-    void init();
-
-    // check whether time for data reset and log
-    bool isTimeForDataReset();
-
     // serial
-    bool serialIsManual();
     void startSerialData();
     int processSerialData(byte b);
     void completeSerialData();
 
     // state
     DeviceState* getDS() { return(ds); }; // return device state
+    DeviceStateSerial* getDSS() { return(dss); }; // return device state serial
     void saveDS(); // save device state to EEPROM
     bool restoreDS(); // load device state from EEPROM
 
-    // state changes and corresponding commands
-    bool changeDataLoggingPeriod(int period);
-    bool parseDataLoggingPeriod();
-    void assembleStateInformation();
-
     // particle command
     void parseCommand (); // parse a cloud command
+
 };
 
 /**** CONSTRUCTION ****/
@@ -75,23 +64,6 @@ void ScaleController::construct(const int digits) {
   data[0] = DeviceData("weight", digits);
 }
 
-/**** SETUP & LOOP ****/
-
-void ScaleController::init() {
-  DeviceControllerSerial::init();
-  last_data_log = millis();
-}
-
-/**** DATA LOGGING ****/
-
-bool ScaleController::isTimeForDataReset() {
-  unsigned long log_period = state->data_logging_period * 1000;
-  if (serialIsActive() && !serialIsManual() && (millis() - last_data_log) > log_period) {
-    last_data_log = millis();
-    return(true);
-  }
-  return(false);
-}
 
 /**** SERIAL COMMUNICATION ****/
 
@@ -110,10 +82,6 @@ bool ScaleController::isTimeForDataReset() {
 
 const int data_pattern[] = {P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, B_SPACE, B_SPACE, P_UNIT, P_STABLE, B_CR, B_NL};
 const int data_pattern_size = sizeof(data_pattern) / sizeof(data_pattern[0]) - 1;
-
-bool ScaleController::serialIsManual(){
-  return(state->data_logging_period == 0);
-}
 
 void ScaleController::startSerialData() {
   DeviceControllerSerial::startSerialData();
@@ -168,7 +136,9 @@ void ScaleController::completeSerialData() {
 // save device state to EEPROM
 void ScaleController::saveDS() {
   EEPROM.put(STATE_ADDRESS, *state);
-  Serial.println("INFO: scale state saved in memory (if any updates were necessary)");
+  #ifdef STATE_DEBUG_ON
+    Serial.println("INFO: scale state saved in memory (if any updates were necessary)");
+  #endif
 }
 
 // load device state from EEPROM
@@ -178,75 +148,25 @@ bool ScaleController::restoreDS(){
   bool recoverable = saved_state.version == STATE_VERSION;
   if(recoverable) {
     EEPROM.get(STATE_ADDRESS, *state);
-    Serial.println("INFO: successfully restored state from memory (version " + String(STATE_VERSION) + ")");
+    Serial.printf("INFO: successfully restored state from memory (version %d)\n", STATE_VERSION);
   } else {
-    Serial.println("INFO: could not restore state from memory (found version " + String(saved_state.version) + "), sticking with initial default");
+    Serial.printf("INFO: could not restore state from memory (found version %d), sticking with initial default\n", saved_state.version);
     saveDS();
   }
   return(recoverable);
 }
 
-/**** CHANGING STATE ****/
-
-// read period
-bool ScaleController::changeDataLoggingPeriod(int period) {
-  bool changed = period != state->data_logging_period;
-
-  if (changed) {
-    state->data_logging_period = period;
-    Serial.println("INFO: setting data logging period to " + String(period) + " seconds");
-    saveDS();
-  } else {
-    Serial.println("INFO: data logging period unchanged (" + String(period) + ")");
-  }
-  return(changed);
-}
-
-bool ScaleController::parseDataLoggingPeriod() {
-  if (command.parseVariable(CMD_DATA_LOG_PERIOD)) {
-    // parse read period
-    command.extractValue();
-    if (command.parseValue(CMD_DATA_LOG_PERIOD_MANUAL)){
-      // manual logging
-      command.success(changeDataLoggingPeriod(0));
-    } else {
-      int period = atoi(command.value);
-      if (period > 0) {
-        command.success(changeDataLoggingPeriod(period));
-        strcpy(command.units, "seconds");
-      } else {
-        command.errorValue();
-      }
-    }
-    getStateDataLoggingPeriodText(state->data_logging_period, command.data, sizeof(command.data));
-  }
-  return(command.isTypeDefined());
-}
-
-/******  STATE INFORMATION *******/
-
-void ScaleController::assembleStateInformation() {
-  DeviceController::assembleStateInformation();
-  char pair[60];
-  getStateDataLoggingPeriodText(state->data_logging_period, pair, sizeof(pair)); addToStateInformation(pair);
-}
 
 /****** WEB COMMAND PROCESSING *******/
 
 void ScaleController::parseCommand() {
 
-  // decision tree
-  if (parseLocked()) {
-    // locked is getting parsed
-  } else if (parseStateLogging()) {
-    // state logging getting parsed
-  } else if (parseDataLogging()) {
-    // state logging getting parsed
-  } else if (parseDataLoggingPeriod()) {
-    // parsing read period
-  } else {
-    // other commands
-    // FIXME: continue here
+  DeviceControllerSerial::parseCommand();
+
+  if (command.isTypeDefined()) {
+    // command processed successfully by parent function
   }
+
+  // additional, device specific commands
 
 }
