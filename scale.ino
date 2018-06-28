@@ -65,19 +65,38 @@ void update_gui_state() {
 void update_gui_data() {
   // lcd
   if (lcd) {
-    // running data
-    if (scale->data[0].getN() > 0)
-      getDataDoubleText("Avg", scale->data[0].getValue(), scale->data[0].units, scale->data[0].getN(), lcd_buffer, sizeof(lcd_buffer), PATTERN_KVUN_SIMPLE, scale->data[0].decimals);
-    else
-      strcpy(lcd_buffer, "Avg: no data yet");
-    lcd->printLine(2, String(lcd_buffer));
 
     // latest data
     if (scale->data[0].newest_value_valid)
       getDataDoubleText("Last", scale->data[0].newest_value, scale->data[0].units, lcd_buffer, sizeof(lcd_buffer), PATTERN_KVU_SIMPLE, scale->data[0].decimals - 1);
     else
       strcpy(lcd_buffer, "Last: no data yet");
+    lcd->printLine(2, String(lcd_buffer));
+
+    // running data
+    if (scale->data[0].getN() > 0)
+      getDataDoubleText("Avg", scale->data[0].getValue(), scale->data[0].units, scale->data[0].getN(),
+        lcd_buffer, sizeof(lcd_buffer), PATTERN_KVUN_SIMPLE, scale->data[0].getDecimals());
+    else
+      strcpy(lcd_buffer, "Avg: no data yet");
     lcd->printLine(3, String(lcd_buffer));
+
+    // rate
+    if (state->calc_rate == CALC_RATE_OFF) {
+      if (scale->data[0].getN() > 1)
+        getDataDoubleText("SD", scale->data[0].getStdDev(), scale->data[0].units, scale->data[0].getN(),
+          lcd_buffer, sizeof(lcd_buffer), PATTERN_KVUN_SIMPLE, scale->data[0].getDecimals());
+      else
+        strcpy(lcd_buffer, "SD: not enough data");
+      lcd->printLine(4, String(lcd_buffer));
+    } else {
+      if (scale->data[1].newest_value_valid)
+        getDataDoubleText("Rate", scale->data[1].newest_value, scale->data[1].units, lcd_buffer, sizeof(lcd_buffer), PATTERN_KVU_SIMPLE, scale->data[1].decimals);
+      else
+        strcpy(lcd_buffer, "Rate: not enough data");
+      lcd->printLine(4, String(lcd_buffer));
+    }
+
   }
 }
 

@@ -23,6 +23,12 @@ class ScaleController : public DeviceControllerSerial {
     DeviceStateSerial* dss = state;
     DeviceState* ds = state;
 
+    // weight memory for rate calculation
+    RunningStats prev_weight1;
+    RunningStats prev_weight2;
+    unsigned long prev_data_time1;
+    unsigned long prev_data_time2;
+
     // serial communication
     int data_pattern_pos;
     void construct();
@@ -57,16 +63,24 @@ class ScaleController : public DeviceControllerSerial {
     bool changeCalcRate(uint rate);
     bool parseCalcRate();
 
+    // data and rate calculations
+    void logData();
+    void clearData();
+    void resetData();
+    void calculateRate();
+    void setRateUnits();
+
 };
 
 /**** CONSTRUCTION ****/
 
 void ScaleController::construct() {
   // start data vector
-  data.resize(1);
+  data.resize(2);
   data[0] = DeviceData("weight");
+  data[1] = DeviceData("rate");
+  data[1].setAutoClear(false);
 }
-
 
 /**** SERIAL COMMUNICATION ****/
 
@@ -106,8 +120,9 @@ int ScaleController::processSerialData(byte b) {
     else if (c == 'C') setSerialUnitsBuffer("ct"); // what is ct??
     if (!data[0].isUnitsIdentical(units_buffer)) {
       // units are switching
-      data[0].reset();
+      resetData();
       data[0].setUnits(units_buffer);
+      setRateUnits();
     }
   } else if (data_pattern[data_pattern_pos] == P_STABLE && (c == 'S' || c == ' ')) {
     // whether the reading is stable - note: not currently interpreted
@@ -129,6 +144,7 @@ int ScaleController::processSerialData(byte b) {
 }
 
 void ScaleController::completeSerialData() {
+  // weight
   data[0].setNewestValue(value_buffer, true, 1L); // infer decimals and add 1
   data[0].saveNewestValue(true); // average
   DeviceControllerSerial::completeSerialData();
@@ -191,7 +207,9 @@ bool ScaleController::changeCalcRate(uint rate) {
 
   if (changed) {
     state->calc_rate = rate;
-    resetData(); // make sure no data is averaged with different calc-rate settings
+    setRateUnits(); // update units
+    calculateRate(); // recalculate rate
+    updateDataInformation(); // update data information
   }
 
   #ifdef STATE_DEBUG_ON
@@ -230,4 +248,58 @@ bool ScaleController::parseCalcRate() {
     getStateCalcRateText(state->calc_rate, command.data, sizeof(command.data));
   }
   return(command.isTypeDefined());
+}
+
+/**** DATA and RATE CALCULATIONS ****/
+
+void ScaleController::logData() {
+  // calculate rate every time the weight data is logged
+  prev_weight2 = prev_weight1;
+  prev_data_time2 = prev_data_time1;
+  prev_weight1 = data[0].value;
+  prev_data_time1 = data[0].data_time.getMean();
+  calculateRate();
+  DeviceControllerSerial::logData();
+}
+
+void ScaleController::resetData() {
+  DeviceControllerSerial::resetData();
+  // also reset stored weight data
+  prev_weight1.clear();
+  prev_weight2.clear();
+}
+
+void ScaleController::calculateRate() {
+
+  if (state->calc_rate == CALC_RATE_OFF || prev_weight1.getN() == 0 || prev_weight2.getN() == 0) {
+    // no rate calculation OR not enough data for rate calculation, make sure to clear
+    data[1].clear(true);
+  } else {
+    // calculate rate
+    double time_diff = (double) prev_data_time1 - (double) prev_data_time2;
+    if (state->calc_rate == CALC_RATE_SEC) time_diff = time_diff / 1000.;
+    else if (state->calc_rate == CALC_RATE_MIN) time_diff = time_diff / 1000. / 60.;
+    else if (state->calc_rate == CALC_RATE_HR) time_diff = time_diff / 1000. / 60. / 60.;
+    else if (state->calc_rate == CALC_RATE_DAY) time_diff = time_diff / 1000. / 60. / 60. / 24.;
+    double rate = (prev_weight1.getMean() - prev_weight2.getMean()) / time_diff;
+    data[1].setNewestValue(rate);
+
+    // calculate mean data time
+    unsigned long data_time = (unsigned long) round( 0.5 * ((double) prev_data_time1 + (double) prev_data_time2) );
+    data[1].setNewestDataTime(data_time);
+    data[1].saveNewestValue(false);
+    data[1].value.n = prev_weight1.getN() + prev_weight2.getN();
+
+    // set decimals to 4 significant digits
+    data[1].setDecimals(find_signif_decimals (rate, 4, false, 5));
+  }
+}
+
+void ScaleController::setRateUnits() {
+  char rate_units[10];
+  strncpy(rate_units, data[0].units, sizeof(rate_units) - 1);
+  strcpy(rate_units + strlen(data[0].units), "/");
+  getStateCalcRateText(state->calc_rate, rate_units + strlen(data[0].units) + 1, sizeof(rate_units), true);
+  rate_units[sizeof(rate_units) - 1] = 0;
+  data[1].setUnits(rate_units);
 }
