@@ -11,10 +11,13 @@ TimeSync* ts = new TimeSync();
 // debugging options
 #define CLOUD_DEBUG_ON
 #define CLOUD_DEBUG_NOSEND
-#define STATE_DEBUG_ON
+//#define STATE_DEBUG_ON
 #define DATA_DEBUG_ON
-#define SERIAL_DEBUG_ON
+//#define SERIAL_DEBUG_ON
 //#define LCD_DEBUG_ON
+
+// keep track of installed version
+#define DEVICE_VERSION  "0.5"
 
 // scale controller
 #include "ScaleController.h"
@@ -40,9 +43,7 @@ ScaleController* scale = new ScaleController(
   /* lcd screen */        lcd,
   /* baud rate */         4800,
   /* serial config */     SERIAL_8N1,
-  /* request wait */      5000, // FIXME: maybe move to state
   /* error wait */        500,
-  /* report digits */     3, // FIXME: maybe move to state
   /* pointer to state */  state
 );
 
@@ -65,24 +66,15 @@ void update_gui_data() {
   // lcd
   if (lcd) {
     // running data
-    if (scale->serialIsManual()) {
-      // manual mode (show latest)
-      if (scale->data[0].n > 0)
-        Time.format(Time.now() - scale->data[0].data_time, "%Y-%m-%d %H:%M:%S %Z").toCharArray(lcd_buffer, sizeof(lcd_buffer));
-      else
-        strcpy(lcd_buffer, "Time: no data yet");
-    } else {
-      // automatic mode (show average)
-      if (scale->data[0].n > 0)
-        getDataDoubleText("Avg", scale->data[0].value, scale->data[0].units, scale->data[0].n, lcd_buffer, sizeof(lcd_buffer), PATTERN_KVUN_SIMPLE, scale->data[0].digits);
-      else
-        strcpy(lcd_buffer, "Avg: no data yet");
-    }
+    if (scale->data[0].getN() > 0)
+      getDataDoubleText("Avg", scale->data[0].getValue(), scale->data[0].units, scale->data[0].getN(), lcd_buffer, sizeof(lcd_buffer), PATTERN_KVUN_SIMPLE, scale->data[0].decimals);
+    else
+      strcpy(lcd_buffer, "Avg: no data yet");
     lcd->printLine(2, String(lcd_buffer));
 
     // latest data
     if (scale->data[0].newest_value_valid)
-      getDataDoubleText("Last", scale->data[0].newest_value, scale->data[0].units, lcd_buffer, sizeof(lcd_buffer), PATTERN_KVU_SIMPLE, 1);
+      getDataDoubleText("Last", scale->data[0].newest_value, scale->data[0].units, lcd_buffer, sizeof(lcd_buffer), PATTERN_KVU_SIMPLE, scale->data[0].decimals - 1);
     else
       strcpy(lcd_buffer, "Last: no data yet");
     lcd->printLine(3, String(lcd_buffer));
@@ -111,16 +103,16 @@ void setup() {
 
   // serial
   Serial.begin(9600);
-  delay(3000);
+  delay(1000);
 
   // time sync
   ts->init();
 
   // lcd temporary messages
-  lcd->setTempTextShowTime(5); // 3 sconds temp text
+  lcd->setTempTextShowTime(4); // how many seconds temp time
 
   // scale
-  Serial.println("INFO: initialize scale");
+  Serial.println("INFO: initialize scale version " + String(DEVICE_VERSION));
   scale->setCommandCallback(report_command);
   scale->setDataCallback(report_data);
   scale->init();

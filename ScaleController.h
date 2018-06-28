@@ -25,7 +25,7 @@ class ScaleController : public DeviceControllerSerial {
 
     // serial communication
     int data_pattern_pos;
-    void construct(const int digits);
+    void construct();
 
   public:
 
@@ -33,12 +33,12 @@ class ScaleController : public DeviceControllerSerial {
     ScaleController();
 
     // without LCD
-    ScaleController (int reset_pin, const long baud_rate, const long serial_config, const int request_wait, const int error_wait, const int digits, ScaleState* state) :
-      DeviceControllerSerial(reset_pin, baud_rate, serial_config, "#", request_wait, error_wait), state(state) { construct(digits); }
+    ScaleController (int reset_pin, const long baud_rate, const long serial_config, const int error_wait, ScaleState* state) :
+      DeviceControllerSerial(reset_pin, baud_rate, serial_config, "#", error_wait), state(state) { construct(); }
 
     // with LCD
-    ScaleController (int reset_pin, DeviceDisplay* lcd, const long baud_rate, const long serial_config, const int request_wait, const int error_wait, const int digits, ScaleState* state) :
-      DeviceControllerSerial(reset_pin, lcd, baud_rate, serial_config, "#", request_wait, error_wait), state(state) { construct(digits); }
+    ScaleController (int reset_pin, DeviceDisplay* lcd, const long baud_rate, const long serial_config, const int error_wait, ScaleState* state) :
+      DeviceControllerSerial(reset_pin, lcd, baud_rate, serial_config, "#", error_wait), state(state) { construct(); }
 
     // serial
     void startSerialData();
@@ -61,10 +61,10 @@ class ScaleController : public DeviceControllerSerial {
 
 /**** CONSTRUCTION ****/
 
-void ScaleController::construct(const int digits) {
+void ScaleController::construct() {
   // start data vector
   data.resize(1);
-  data[0] = DeviceData("weight", digits);
+  data[0] = DeviceData("weight");
 }
 
 
@@ -106,7 +106,7 @@ int ScaleController::processSerialData(byte b) {
     else if (c == 'C') setSerialUnitsBuffer("ct"); // what is ct??
     if (!data[0].isUnitsIdentical(units_buffer)) {
       // units are switching
-      data[0].resetValue();
+      data[0].reset();
       data[0].setUnits(units_buffer);
     }
   } else if (data_pattern[data_pattern_pos] == P_STABLE && (c == 'S' || c == ' ')) {
@@ -129,7 +129,7 @@ int ScaleController::processSerialData(byte b) {
 }
 
 void ScaleController::completeSerialData() {
-  data[0].setNewestValue(value_buffer);
+  data[0].setNewestValue(value_buffer, true, 1L); // infer decimals and add 1
   data[0].saveNewestValue(true); // average
   DeviceControllerSerial::completeSerialData();
 }
