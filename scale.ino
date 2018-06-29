@@ -10,7 +10,7 @@ TimeSync* ts = new TimeSync();
 
 // debugging options
 #define CLOUD_DEBUG_ON
-#define CLOUD_DEBUG_NOSEND
+//#define CLOUD_DEBUG_NOSEND
 //#define STATE_DEBUG_ON
 #define DATA_DEBUG_ON
 //#define SERIAL_DEBUG_ON

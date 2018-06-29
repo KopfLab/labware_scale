@@ -30,7 +30,7 @@ class ScaleController : public DeviceControllerSerial {
     unsigned long prev_data_time2;
 
     // serial communication
-    int data_pattern_pos;
+    int data_PATTERN_Ios;
     void construct();
 
   public:
@@ -63,10 +63,12 @@ class ScaleController : public DeviceControllerSerial {
     bool changeCalcRate(uint rate);
     bool parseCalcRate();
 
-    // data and rate calculations
+    // data logging
+    void assembleDataLog();
     void logData();
-    void clearData();
     void resetData();
+
+    // rate calculations
     void calculateRate();
     void setRateUnits();
 
@@ -77,8 +79,8 @@ class ScaleController : public DeviceControllerSerial {
 void ScaleController::construct() {
   // start data vector
   data.resize(2);
-  data[0] = DeviceData("weight");
-  data[1] = DeviceData("rate");
+  data[0] = DeviceData(1, "weight");
+  data[1] = DeviceData(2, "rate");
   data[1].setAutoClear(false);
 }
 
@@ -102,7 +104,7 @@ const int data_pattern_size = sizeof(data_pattern) / sizeof(data_pattern[0]) - 1
 
 void ScaleController::startSerialData() {
   DeviceControllerSerial::startSerialData();
-  data_pattern_pos = 0;
+  data_PATTERN_Ios = 0;
 }
 
 int ScaleController::processSerialData(byte b) {
@@ -111,9 +113,9 @@ int ScaleController::processSerialData(byte b) {
 
   // pattern interpretation
   char c = (char) b;
-  if ( data_pattern[data_pattern_pos] == P_VAL && ( (b >= B_0 && b <= B_9) || c == ' ' || c == '+' || c == '-' || c == '.') ) {
+  if ( data_pattern[data_PATTERN_Ios] == P_VAL && ( (b >= B_0 && b <= B_9) || c == ' ' || c == '+' || c == '-' || c == '.') ) {
     if (b != B_SPACE) appendToSerialValueBuffer(b); // value (ignoring spaces)
-  } else if (data_pattern[data_pattern_pos] == P_UNIT && (c == 'G' || c == 'O' || c == 'C')) {
+  } else if (data_pattern[data_PATTERN_Ios] == P_UNIT && (c == 'G' || c == 'O' || c == 'C')) {
     // units
     if (c == 'G') setSerialUnitsBuffer("g"); // grams
     else if (c == 'O') setSerialUnitsBuffer("oz"); // ounces
@@ -124,9 +126,9 @@ int ScaleController::processSerialData(byte b) {
       data[0].setUnits(units_buffer);
       setRateUnits();
     }
-  } else if (data_pattern[data_pattern_pos] == P_STABLE && (c == 'S' || c == ' ')) {
+  } else if (data_pattern[data_PATTERN_Ios] == P_STABLE && (c == 'S' || c == ' ')) {
     // whether the reading is stable - note: not currently interpreted
-  } else if (data_pattern[data_pattern_pos] > P_BYTE && b == data_pattern[data_pattern_pos]) {
+  } else if (data_pattern[data_PATTERN_Ios] > P_BYTE && b == data_pattern[data_PATTERN_Ios]) {
     // specific ascii characters
   } else {
     // unrecognized part of data --> error
@@ -134,10 +136,10 @@ int ScaleController::processSerialData(byte b) {
   }
 
   // next data pattern position
-  data_pattern_pos++;
+  data_PATTERN_Ios++;
 
   // message complete
-  if (data_pattern_pos > data_pattern_size) {
+  if (data_PATTERN_Ios > data_pattern_size) {
     return(SERIAL_DATA_COMPLETE);
   }
   return(SERIAL_DATA_WAITING);
@@ -250,7 +252,9 @@ bool ScaleController::parseCalcRate() {
   return(command.isTypeDefined());
 }
 
-/**** DATA and RATE CALCULATIONS ****/
+/** DATA **/
+
+void ScaleController::assembleDataLog() { DeviceControllerSerial::assembleDataLog(false); }
 
 void ScaleController::logData() {
   // calculate rate every time the weight data is logged
@@ -268,6 +272,8 @@ void ScaleController::resetData() {
   prev_weight1.clear();
   prev_weight2.clear();
 }
+
+/**** RATE CALCULATIONS ****/
 
 void ScaleController::calculateRate() {
 
