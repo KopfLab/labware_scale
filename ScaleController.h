@@ -291,7 +291,7 @@ void ScaleController::calculateRate() {
     data[1].setNewestValue(rate);
 
     // calculate mean data time
-    unsigned long data_time = (unsigned long) round( 0.5 * ((double) prev_data_time1 + (double) prev_data_time2) );
+    unsigned long data_time = (unsigned long) round( 0.5 * (double) prev_data_time1 + 0.5 * (double) prev_data_time2 );
     data[1].setNewestDataTime(data_time);
     data[1].saveNewestValue(false);
     data[1].value.n = prev_weight1.getN() + prev_weight2.getN();

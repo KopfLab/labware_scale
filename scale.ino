@@ -10,14 +10,14 @@ TimeSync* ts = new TimeSync();
 
 // debugging options
 #define CLOUD_DEBUG_ON
-//#define CLOUD_DEBUG_NOSEND
+//#define WEBHOOKS_DEBUG_ON
 //#define STATE_DEBUG_ON
 #define DATA_DEBUG_ON
 //#define SERIAL_DEBUG_ON
 //#define LCD_DEBUG_ON
 
 // keep track of installed version
-#define DEVICE_VERSION  "0.5.2"
+#define DEVICE_VERSION  "0.5.3"
 
 // scale controller
 #include "ScaleController.h"
