@@ -1,5 +1,5 @@
 #pragma once
-#include "device/DeviceStateSerial.h"
+#include "device/SerialDeviceState.h"
 
 // additional commands
 #define CMD_CALC_RATE          "calc-rate" // device calc-rate <unit> [notes] : whether to calculate rates and if so which time units they have
@@ -17,14 +17,14 @@
 #define CALC_RATE_DAY   86400
 
 // scale state
-struct ScaleState : public DeviceStateSerial {
+struct ScaleState : public SerialDeviceState {
 
   uint calc_rate;
 
   ScaleState() {};
 
   ScaleState (bool locked, bool state_logging, bool data_logging, uint data_reading_period_min, uint data_reading_period, uint data_logging_period, uint8_t data_logging_type, uint calc_rate) :
-    DeviceStateSerial(locked, state_logging, data_logging, data_reading_period_min, data_reading_period, data_logging_period, data_logging_type), calc_rate(calc_rate) {};
+    SerialDeviceState(locked, state_logging, data_logging, data_reading_period_min, data_reading_period, data_logging_period, data_logging_type), calc_rate(calc_rate) {};
 
 };
 

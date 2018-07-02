@@ -7,20 +7,20 @@
 #pragma once
 #include <vector>
 #include "ScaleState.h"
-#include "device/DeviceControllerSerial.h"
+#include "device/SerialDeviceController.h"
 
 // serial communication constants
 #define SCALE_DATA_REQUEST  "#" // data request command
 
 
 // controller class
-class ScaleController : public DeviceControllerSerial {
+class ScaleController : public SerialDeviceController {
 
   private:
 
     // state
     ScaleState* state;
-    DeviceStateSerial* dss = state;
+    SerialDeviceState* dss = state;
     DeviceState* ds = state;
 
     // weight memory for rate calculation
@@ -40,11 +40,11 @@ class ScaleController : public DeviceControllerSerial {
 
     // without LCD
     ScaleController (int reset_pin, const long baud_rate, const long serial_config, const int error_wait, ScaleState* state) :
-      DeviceControllerSerial(reset_pin, baud_rate, serial_config, SCALE_DATA_REQUEST, error_wait), state(state) { construct(); }
+      SerialDeviceController(reset_pin, baud_rate, serial_config, SCALE_DATA_REQUEST, error_wait), state(state) { construct(); }
 
     // with LCD
     ScaleController (int reset_pin, DeviceDisplay* lcd, const long baud_rate, const long serial_config, const int error_wait, ScaleState* state) :
-      DeviceControllerSerial(reset_pin, lcd, baud_rate, serial_config, SCALE_DATA_REQUEST, error_wait), state(state) { construct(); }
+      SerialDeviceController(reset_pin, lcd, baud_rate, serial_config, SCALE_DATA_REQUEST, error_wait), state(state) { construct(); }
 
     // serial
     void startSerialData();
@@ -54,7 +54,7 @@ class ScaleController : public DeviceControllerSerial {
     // state
     void assembleStateInformation();
     DeviceState* getDS() { return(ds); }; // return device state
-    DeviceStateSerial* getDSS() { return(dss); }; // return device state serial
+    SerialDeviceState* getDSS() { return(dss); }; // return device state serial
     void saveDS(); // save device state to EEPROM
     bool restoreDS(); // load device state from EEPROM
 
@@ -103,13 +103,13 @@ const int data_pattern[] = {P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_VAL, P_V
 const int data_pattern_size = sizeof(data_pattern) / sizeof(data_pattern[0]) - 1;
 
 void ScaleController::startSerialData() {
-  DeviceControllerSerial::startSerialData();
+  SerialDeviceController::startSerialData();
   data_pattern_pos = 0;
 }
 
 int ScaleController::processSerialData(byte b) {
   // keep track of all data
-  DeviceControllerSerial::processSerialData(b);
+  SerialDeviceController::processSerialData(b);
 
   // pattern interpretation
   char c = (char) b;
@@ -149,13 +149,13 @@ void ScaleController::completeSerialData() {
   // weight
   data[0].setNewestValue(value_buffer, true, 1L); // infer decimals and add 1
   data[0].saveNewestValue(true); // average
-  DeviceControllerSerial::completeSerialData();
+  SerialDeviceController::completeSerialData();
 }
 
 /****** STATE INFORMATION *******/
 
 void ScaleController::assembleStateInformation() {
-  DeviceControllerSerial::assembleStateInformation();
+  SerialDeviceController::assembleStateInformation();
   char pair[60];
   getStateCalcRateText(state->calc_rate, pair, sizeof(pair)); addToStateInformation(pair);
 }
@@ -191,7 +191,7 @@ bool ScaleController::restoreDS(){
 
 void ScaleController::parseCommand() {
 
-  DeviceControllerSerial::parseCommand();
+  SerialDeviceController::parseCommand();
 
   if (command.isTypeDefined()) {
     // command processed successfully by parent function
@@ -254,7 +254,7 @@ bool ScaleController::parseCalcRate() {
 
 /** DATA **/
 
-void ScaleController::assembleDataLog() { DeviceControllerSerial::assembleDataLog(false); }
+void ScaleController::assembleDataLog() { SerialDeviceController::assembleDataLog(false); }
 
 void ScaleController::logData() {
   // calculate rate every time the weight data is logged
@@ -263,11 +263,11 @@ void ScaleController::logData() {
   prev_weight1 = data[0].value;
   prev_data_time1 = data[0].data_time.getMean();
   calculateRate();
-  DeviceControllerSerial::logData();
+  SerialDeviceController::logData();
 }
 
 void ScaleController::resetData() {
-  DeviceControllerSerial::resetData();
+  SerialDeviceController::resetData();
   // also reset stored weight data
   prev_weight1.clear();
   prev_weight2.clear();
