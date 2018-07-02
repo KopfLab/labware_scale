@@ -30,7 +30,7 @@ class ScaleController : public DeviceControllerSerial {
     unsigned long prev_data_time2;
 
     // serial communication
-    int data_PATTERN_Ios;
+    int data_pattern_pos;
     void construct();
 
   public:
@@ -104,7 +104,7 @@ const int data_pattern_size = sizeof(data_pattern) / sizeof(data_pattern[0]) - 1
 
 void ScaleController::startSerialData() {
   DeviceControllerSerial::startSerialData();
-  data_PATTERN_Ios = 0;
+  data_pattern_pos = 0;
 }
 
 int ScaleController::processSerialData(byte b) {
@@ -113,9 +113,9 @@ int ScaleController::processSerialData(byte b) {
 
   // pattern interpretation
   char c = (char) b;
-  if ( data_pattern[data_PATTERN_Ios] == P_VAL && ( (b >= B_0 && b <= B_9) || c == ' ' || c == '+' || c == '-' || c == '.') ) {
+  if ( data_pattern[data_pattern_pos] == P_VAL && ( (b >= B_0 && b <= B_9) || c == ' ' || c == '+' || c == '-' || c == '.') ) {
     if (b != B_SPACE) appendToSerialValueBuffer(b); // value (ignoring spaces)
-  } else if (data_pattern[data_PATTERN_Ios] == P_UNIT && (c == 'G' || c == 'O' || c == 'C')) {
+  } else if (data_pattern[data_pattern_pos] == P_UNIT && (c == 'G' || c == 'O' || c == 'C')) {
     // units
     if (c == 'G') setSerialUnitsBuffer("g"); // grams
     else if (c == 'O') setSerialUnitsBuffer("oz"); // ounces
@@ -126,9 +126,9 @@ int ScaleController::processSerialData(byte b) {
       data[0].setUnits(units_buffer);
       setRateUnits();
     }
-  } else if (data_pattern[data_PATTERN_Ios] == P_STABLE && (c == 'S' || c == ' ')) {
+  } else if (data_pattern[data_pattern_pos] == P_STABLE && (c == 'S' || c == ' ')) {
     // whether the reading is stable - note: not currently interpreted
-  } else if (data_pattern[data_PATTERN_Ios] > P_BYTE && b == data_pattern[data_PATTERN_Ios]) {
+  } else if (data_pattern[data_pattern_pos] > P_BYTE && b == data_pattern[data_pattern_pos]) {
     // specific ascii characters
   } else {
     // unrecognized part of data --> error
@@ -136,10 +136,10 @@ int ScaleController::processSerialData(byte b) {
   }
 
   // next data pattern position
-  data_PATTERN_Ios++;
+  data_pattern_pos++;
 
   // message complete
-  if (data_PATTERN_Ios > data_pattern_size) {
+  if (data_pattern_pos > data_pattern_size) {
     return(SERIAL_DATA_COMPLETE);
   }
   return(SERIAL_DATA_WAITING);
