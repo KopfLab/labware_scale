@@ -40,11 +40,11 @@ class ScaleController : public DeviceControllerSerial {
 
     // without LCD
     ScaleController (int reset_pin, const long baud_rate, const long serial_config, const int error_wait, ScaleState* state) :
-      DeviceControllerSerial(reset_pin, baud_rate, serial_config, "#", error_wait), state(state) { construct(); }
+      DeviceControllerSerial(reset_pin, baud_rate, serial_config, SCALE_DATA_REQUEST, error_wait), state(state) { construct(); }
 
     // with LCD
     ScaleController (int reset_pin, DeviceDisplay* lcd, const long baud_rate, const long serial_config, const int error_wait, ScaleState* state) :
-      DeviceControllerSerial(reset_pin, lcd, baud_rate, serial_config, "#", error_wait), state(state) { construct(); }
+      DeviceControllerSerial(reset_pin, lcd, baud_rate, serial_config, SCALE_DATA_REQUEST, error_wait), state(state) { construct(); }
 
     // serial
     void startSerialData();

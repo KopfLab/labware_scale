@@ -17,7 +17,7 @@ TimeSync* ts = new TimeSync();
 //#define LCD_DEBUG_ON
 
 // keep track of installed version
-#define DEVICE_VERSION  "0.5.5"
+#define DEVICE_VERSION  "0.5.6"
 
 // scale controller
 #include "ScaleController.h"
