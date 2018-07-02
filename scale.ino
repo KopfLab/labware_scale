@@ -1,9 +1,6 @@
 #pragma SPARK_NO_PREPROCESSOR // disable spark preprocssor to avoid issues with callbacks
 #include "application.h"
 
-// enable/disable sub-systems
-// #define ENABLE_DISPLAY
-
 // time sync
 #include "TimeSync.h";
 TimeSync* ts = new TimeSync();
@@ -17,7 +14,7 @@ TimeSync* ts = new TimeSync();
 //#define LCD_DEBUG_ON
 
 // keep track of installed version
-#define DEVICE_VERSION  "0.5.6"
+#define DEVICE_VERSION  "0.5.7"
 
 // scale controller
 #include "ScaleController.h"
@@ -51,15 +48,6 @@ ScaleController* scale = new ScaleController(
 char lcd_buffer[21];
 
 void update_gui_state() {
-  // lcd
-  if (lcd) {
-    // state updates
-    if (state->data_logging)
-      getStateDataLoggingPeriodText(state->data_logging_period, state->data_logging_type, lcd_buffer, sizeof(lcd_buffer), true);
-    else
-      strcpy(lcd_buffer, "off");
-    lcd->printLine(4, "Log: " + String(lcd_buffer));
-  }
 }
 
 void update_gui_data() {
