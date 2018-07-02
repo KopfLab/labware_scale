@@ -14,8 +14,8 @@ TimeSync* ts = new TimeSync();
 //#define LCD_DEBUG_ON
 
 // keep track of installed version
-#define STATE_VERSION    7 // update whenver structure changes
-#define DEVICE_VERSION  "0.6" // update with every code update
+#define STATE_VERSION    8 // update whenver structure changes
+#define DEVICE_VERSION  "0.6.3" // update with every code update
 
 // scale controller
 #include "ScaleController.h"
@@ -28,7 +28,7 @@ ScaleState* state = new ScaleState(
   /* locked */                    false,
   /* state_logging */             true,
   /* data_logging */              false,
-  /* data_reading_period_min */   1000, // in ms
+  /* data_reading_period_min */   2000, // in ms
   /* data_reading_period */       5000, // in ms
   /* data_logging_period */       300, // in seconds
   /* data_logging_type */         LOG_BY_TIME, // log by time
@@ -115,7 +115,7 @@ void setup() {
   ts->init();
 
   // lcd temporary messages
-  lcd->setTempTextShowTime(4); // how many seconds temp time
+  lcd->setTempTextShowTime(3); // how many seconds temp time
 
   // scale
   Serial.println("INFO: initialize scale version " + String(DEVICE_VERSION));
