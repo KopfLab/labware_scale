@@ -14,7 +14,7 @@ TimeSync* ts = new TimeSync();
 //#define LCD_DEBUG_ON
 
 // keep track of installed version
-#define DEVICE_VERSION  "0.5.7"
+#define DEVICE_VERSION  "0.5.8"
 
 // scale controller
 #include "ScaleController.h"
@@ -90,8 +90,6 @@ void update_gui_data() {
 
 // callback function for commands
 void report_command () {
-  Serial.printf("INFO: command callback: command = '%s'\n -> type = '%s' (%s), variable = '%s', value = '%s', msg = '%s', notes = '%s'\n",
-    scale->command.command, scale->command.type, scale->command.type_short, scale->command.variable, scale->command.value, scale->command.msg, scale->command.notes);
   update_gui_state();
   update_gui_data();
 }
