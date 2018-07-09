@@ -147,7 +147,7 @@ int ScaleController::processSerialData(byte b) {
 
 void ScaleController::completeSerialData() {
   // weight
-  data[0].setNewestValue(value_buffer, true, 1L); // infer decimals and add 1
+  data[0].setNewestValue(value_buffer, true, 2L); // infer decimals and add 2
   data[0].saveNewestValue(true); // average
   SerialDeviceController::completeSerialData();
 }
@@ -297,7 +297,7 @@ void ScaleController::calculateRate() {
     data[1].value.n = prev_weight1.getN() + prev_weight2.getN();
 
     // set decimals to 4 significant digits
-    data[1].setDecimals(find_signif_decimals (rate, 4, false, 5));
+    data[1].setDecimals(find_signif_decimals (rate, 5, false, 6));
   }
 }
 
