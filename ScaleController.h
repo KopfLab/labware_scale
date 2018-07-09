@@ -49,7 +49,7 @@ class ScaleController : public SerialDeviceController {
     // serial
     void startSerialData();
     int processSerialData(byte b);
-    void completeSerialData();
+    void completeSerialData(int error_count);
 
     // state
     void assembleStateInformation();
@@ -64,7 +64,7 @@ class ScaleController : public SerialDeviceController {
     bool parseCalcRate();
 
     // data logging
-    void assembleDataLog();
+    bool assembleDataLog();
     void logData();
     void resetData();
 
@@ -145,11 +145,12 @@ int ScaleController::processSerialData(byte b) {
   return(SERIAL_DATA_WAITING);
 }
 
-void ScaleController::completeSerialData() {
+void ScaleController::completeSerialData(int error_count) {
   // weight
-  data[0].setNewestValue(value_buffer, true, 2L); // infer decimals and add 2
-  data[0].saveNewestValue(true); // average
-  SerialDeviceController::completeSerialData();
+  if (error_count == 0) {
+    data[0].setNewestValue(value_buffer, true, 2L); // infer decimals and add 2 to improve accuracy of offline calculated rate
+    data[0].saveNewestValue(true); // average
+  }
 }
 
 /****** STATE INFORMATION *******/
@@ -254,7 +255,7 @@ bool ScaleController::parseCalcRate() {
 
 /** DATA **/
 
-void ScaleController::assembleDataLog() { SerialDeviceController::assembleDataLog(false); }
+bool ScaleController::assembleDataLog() { SerialDeviceController::assembleDataLog(false); }
 
 void ScaleController::logData() {
   // calculate rate every time the weight data is logged
