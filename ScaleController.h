@@ -52,6 +52,7 @@ class ScaleController : public SerialDeviceController {
     void completeSerialData(int error_count);
 
     // state
+    void updateStateInformation();
     void assembleStateInformation();
     DeviceState* getDS() { return(ds); }; // return device state
     SerialDeviceState* getDSS() { return(dss); }; // return device state serial
@@ -161,6 +162,48 @@ void ScaleController::assembleStateInformation() {
   getStateCalcRateText(state->calc_rate, pair, sizeof(pair)); addToStateInformation(pair);
 }
 
+void ScaleController::updateStateInformation() {
+
+  // state information
+  DeviceController::updateStateInformation();
+
+  // LCD update
+  if (lcd) {
+
+    // latest data
+    if (data[0].newest_value_valid)
+      getDataDoubleText("Last", data[0].newest_value, data[0].units, lcd_buffer, sizeof(lcd_buffer), PATTERN_KVU_SIMPLE, data[0].decimals - 1);
+    else
+      strcpy(lcd_buffer, "Last: no data yet");
+    lcd->printLine(2, lcd_buffer);
+
+    // running data
+    if (data[0].getN() > 0)
+      getDataDoubleText("Avg", data[0].getValue(), data[0].units, data[0].getN(),
+        lcd_buffer, sizeof(lcd_buffer), PATTERN_KVUN_SIMPLE, data[0].getDecimals());
+    else
+      strcpy(lcd_buffer, "Avg: no data yet");
+    lcd->printLine(3, lcd_buffer);
+
+    // rate
+    if (state->calc_rate == CALC_RATE_OFF) {
+      if (data[0].getN() > 1)
+        getDataDoubleText("SD", data[0].getStdDev(), data[0].units, data[0].getN(),
+          lcd_buffer, sizeof(lcd_buffer), PATTERN_KVUN_SIMPLE, data[0].getDecimals());
+      else
+        strcpy(lcd_buffer, "SD: not enough data");
+      lcd->printLine(4, lcd_buffer);
+    } else {
+      if (data[1].newest_value_valid)
+        getDataDoubleText("Rate", data[1].newest_value, data[1].units, lcd_buffer, sizeof(lcd_buffer), PATTERN_KVU_SIMPLE, data[1].decimals);
+      else
+        strcpy(lcd_buffer, "Rate: not enough data");
+      lcd->printLine(4, lcd_buffer);
+    }
+
+  }
+
+}
 
 /**** STATE PERSISTENCE ****/
 

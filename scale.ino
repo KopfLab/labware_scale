@@ -15,7 +15,7 @@ TimeSync* ts = new TimeSync();
 
 // keep track of installed version
 #define STATE_VERSION    8 // update whenver structure changes
-#define DEVICE_VERSION  "scale 0.6.6" // update with every code update
+#define DEVICE_VERSION  "scale 0.7.0" // update with every code update
 
 // scale controller
 #include "ScaleController.h"
@@ -45,61 +45,6 @@ ScaleController* scale = new ScaleController(
   /* pointer to state */  state
 );
 
-// user interface
-char lcd_buffer[21];
-
-void update_gui_state() {
-}
-
-void update_gui_data() {
-  // lcd
-  if (lcd) {
-
-    // latest data
-    if (scale->data[0].newest_value_valid)
-      getDataDoubleText("Last", scale->data[0].newest_value, scale->data[0].units, lcd_buffer, sizeof(lcd_buffer), PATTERN_KVU_SIMPLE, scale->data[0].decimals - 1);
-    else
-      strcpy(lcd_buffer, "Last: no data yet");
-    lcd->printLine(2, String(lcd_buffer));
-
-    // running data
-    if (scale->data[0].getN() > 0)
-      getDataDoubleText("Avg", scale->data[0].getValue(), scale->data[0].units, scale->data[0].getN(),
-        lcd_buffer, sizeof(lcd_buffer), PATTERN_KVUN_SIMPLE, scale->data[0].getDecimals());
-    else
-      strcpy(lcd_buffer, "Avg: no data yet");
-    lcd->printLine(3, String(lcd_buffer));
-
-    // rate
-    if (state->calc_rate == CALC_RATE_OFF) {
-      if (scale->data[0].getN() > 1)
-        getDataDoubleText("SD", scale->data[0].getStdDev(), scale->data[0].units, scale->data[0].getN(),
-          lcd_buffer, sizeof(lcd_buffer), PATTERN_KVUN_SIMPLE, scale->data[0].getDecimals());
-      else
-        strcpy(lcd_buffer, "SD: not enough data");
-      lcd->printLine(4, String(lcd_buffer));
-    } else {
-      if (scale->data[1].newest_value_valid)
-        getDataDoubleText("Rate", scale->data[1].newest_value, scale->data[1].units, lcd_buffer, sizeof(lcd_buffer), PATTERN_KVU_SIMPLE, scale->data[1].decimals);
-      else
-        strcpy(lcd_buffer, "Rate: not enough data");
-      lcd->printLine(4, String(lcd_buffer));
-    }
-
-  }
-}
-
-// callback function for commands
-void report_command () {
-  update_gui_state();
-  update_gui_data();
-}
-
-// callback function for data
-void report_data() {
-  update_gui_data();
-}
-
 // using system threading to speed up restart after power out
 SYSTEM_THREAD(ENABLED);
 SYSTEM_MODE(SEMI_AUTOMATIC);
@@ -109,7 +54,6 @@ void setup() {
 
   // serial
   Serial.begin(9600);
-  delay(1000);
 
   // time sync
   ts->init();
@@ -118,19 +62,11 @@ void setup() {
   lcd->setTempTextShowTime(3); // how many seconds temp time
 
   // scale
-  Serial.println("INFO: initialize scale version " + String(DEVICE_VERSION));
-  scale->setCommandCallback(report_command);
-  scale->setDataCallback(report_data);
   scale->init();
 
   // connect device to cloud
   Serial.println("INFO: connecting to cloud");
   Particle.connect();
-
-  // initial user interface update
-  update_gui_state();
-  update_gui_data();
-
 }
 
 // loop
