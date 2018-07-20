@@ -52,7 +52,6 @@ class ScaleController : public SerialDeviceController {
     void completeSerialData(int error_count);
 
     // state
-    void updateStateInformation();
     void assembleStateInformation();
     DeviceState* getDS() { return(ds); }; // return device state
     SerialDeviceState* getDSS() { return(dss); }; // return device state serial
@@ -65,6 +64,7 @@ class ScaleController : public SerialDeviceController {
     bool parseCalcRate();
 
     // data logging
+    void updateDataInformation();
     bool assembleDataLog();
     void logData();
     void resetData();
@@ -154,18 +154,11 @@ void ScaleController::completeSerialData(int error_count) {
   }
 }
 
-/****** STATE INFORMATION *******/
+/****** DATA INFORMATION *******/
 
-void ScaleController::assembleStateInformation() {
-  SerialDeviceController::assembleStateInformation();
-  char pair[60];
-  getStateCalcRateText(state->calc_rate, pair, sizeof(pair)); addToStateInformation(pair);
-}
+void ScaleController::updateDataInformation() {
 
-void ScaleController::updateStateInformation() {
-
-  // state information
-  DeviceController::updateStateInformation();
+  SerialDeviceController::updateDataInformation();
 
   // LCD update
   if (lcd) {
@@ -203,6 +196,14 @@ void ScaleController::updateStateInformation() {
 
   }
 
+}
+
+/****** STATE INFORMATION *******/
+
+void ScaleController::assembleStateInformation() {
+  SerialDeviceController::assembleStateInformation();
+  char pair[60];
+  getStateCalcRateText(state->calc_rate, pair, sizeof(pair)); addToStateInformation(pair);
 }
 
 /**** STATE PERSISTENCE ****/
