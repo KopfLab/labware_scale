@@ -339,7 +339,11 @@ void ScaleController::calculateRate() {
     unsigned long data_time = (unsigned long) round( 0.5 * (double) prev_data_time1 + 0.5 * (double) prev_data_time2 );
     data[1].setNewestDataTime(data_time);
     data[1].saveNewestValue(false);
+
+    // n and variance
     data[1].value.n = prev_weight1.getN() + prev_weight2.getN();
+    double variance = (prev_weight1.getVariance() + prev_weight2.getVariance()) / (time_diff * time_diff);
+    data[1].value.M2 = variance * (data[1].value.n - 1); // a bit round-about but works
 
     // set decimals to 4 significant digits
     data[1].setDecimals(find_signif_decimals (rate, 5, false, 6));

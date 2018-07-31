@@ -15,7 +15,7 @@ TimeSync* ts = new TimeSync();
 
 // keep track of installed version
 #define STATE_VERSION    7 // update whenver structure changes
-#define DEVICE_VERSION  "scale 0.7.3" // update with every code update
+#define DEVICE_VERSION  "scale 0.7.4" // update with every code update
 
 // scale controller
 #include "ScaleController.h"
